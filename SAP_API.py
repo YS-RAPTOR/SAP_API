@@ -61,18 +61,18 @@ class SAP_API:
         self.height = bot - top
 
         self.sapHandlerDC = win32gui.GetWindowDC(self.sapHandler)
-        self.sapUIDC = win32ui.CreateDCFromHandle(self.sapHandlerDC)
-        self.saveDC = self.sapUIDC.CreateCompatibleDC()
+        self.sapUI_DC = win32ui.CreateDCFromHandle(self.sapHandlerDC)
+        self.saveDC = self.sapUI_DC.CreateCompatibleDC()
 
         self.bitmap = win32ui.CreateBitmap()
-        self.bitmap.CreateCompatibleBitmap(self.sapUIDC, self.width, self.height)
+        self.bitmap.CreateCompatibleBitmap(self.sapUI_DC, self.width, self.height)
 
         self.saveDC.SelectObject(self.bitmap)
 
     def __del__(self):
         win32gui.DeleteObject(self.bitmap.GetHandle())
         self.saveDC.DeleteDC()
-        self.sapUIDC.DeleteDC()
+        self.sapUI_DC.DeleteDC()
         win32gui.ReleaseDC(self.sapHandler, self.sapHandlerDC)
 
     def GetCapture(self) -> Image:
@@ -82,12 +82,12 @@ class SAP_API:
             return None
         
         #PrintWindow Succeeded
-        bmpinfo = self.bitmap.GetInfo()
-        bmpstr = self.bitmap.GetBitmapBits(True)
+        info = self.bitmap.GetInfo()
+        data = self.bitmap.GetBitmapBits(True)
         return Image.frombuffer(
             'RGB',
-            (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
-            bmpstr, 'raw', 'BGRX', 0, 1)
+            (info['bmWidth'], info['bmHeight']),
+            data, 'raw', 'BGRX', 0, 1)
 
     def GetHandler(pid: int) -> int:
         handles = []
