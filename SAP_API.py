@@ -40,65 +40,79 @@ class GameState():
     round: int
     cost: int
 
+class SAP_API:
+    sapHandler : int
+    width: int
+    height: int
 
-def GetGameState() -> GameState:
-    pass
+    def __init__(self, args: str = ARGS):
+        # Initialize the SAP Variables
+        sapPath = init() + " " + args
 
-def PerformAction(action: ActionTypes, startSlot: int, endSlot: int):
-    pass
+        # Run SAP
+        sapPID = subprocess.Popen(sapPath).pid
+        sleep(5)
+        
+        # Get the window handle
+        self.sapHandler = SAP_API.GetHandler(sapPID)
+        
+        left, top, right, bot = win32gui.GetWindowRect(self.sapHandler)
+        self.width = right - left
+        self.height = bot - top
 
-def GetHandler(pid: int) -> int:
-    
-    handles = []
+        self.sapHandlerDC = win32gui.GetWindowDC(self.sapHandler)
+        self.sapUIDC = win32ui.CreateDCFromHandle(self.sapHandlerDC)
+        self.saveDC = self.sapUIDC.CreateCompatibleDC()
 
-    def WindowCallback(handle, handles):
-        if win32process.GetWindowThreadProcessId(handle)[1]== pid:
-            handles.append(handle)
+        self.bitmap = win32ui.CreateBitmap()
+        self.bitmap.CreateCompatibleBitmap(self.sapUIDC, self.width, self.height)
 
-    win32gui.EnumWindows(WindowCallback, handles)
+        self.saveDC.SelectObject(self.bitmap)
 
-    return handles[0]
+    def __del__(self):
+        win32gui.DeleteObject(self.bitmap.GetHandle())
+        self.saveDC.DeleteDC()
+        self.sapUIDC.DeleteDC()
+        win32gui.ReleaseDC(self.sapHandler, self.sapHandlerDC)
 
-def main():
-    # Initialize the SAP Variables
-    sapPath = init() + " " + ARGS
+    def GetCapture(self) -> Image:
+        result = windll.user32.PrintWindow(self.sapHandler, self.saveDC.GetSafeHdc(), 1)
 
-    # Run SAP
-    sapPID = subprocess.Popen(sapPath).pid
-    sleep(5)
-    
-    # Get the window handle
-    hwnd = GetHandler(sapPID)
-
-    # Change the line below depending on whether you want the whole window
-    # or just the client area. 
-    #left, top, right, bot = win32gui.GetClientRect(hwnd)
-    left, top, right, bot = win32gui.GetWindowRect(hwnd)
-    w = right - left
-    h = bot - top
-    hwnd_dc = win32gui.GetWindowDC(hwnd)
-    mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
-    save_dc = mfc_dc.CreateCompatibleDC()
-    save_bit_map = win32ui.CreateBitmap()
-    save_bit_map.CreateCompatibleBitmap(mfc_dc, w, h)
-    save_dc.SelectObject(save_bit_map)
-    result = windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 1)
-    if result == 0:
-        return False
-    bmpinfo = save_bit_map.GetInfo()
-    bmpstr = save_bit_map.GetBitmapBits(True)
-    img = Image.frombuffer(
-        'RGB',
-        (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
-        bmpstr, 'raw', 'BGRX', 0, 1)
-    win32gui.DeleteObject(save_bit_map.GetHandle())
-    save_dc.DeleteDC()
-    mfc_dc.DeleteDC()
-    win32gui.ReleaseDC(hwnd, hwnd_dc)
-
-    if result == 1:
+        if result == 0:
+            return None
+        
         #PrintWindow Succeeded
-        img.save("test.png")
+        bmpinfo = self.bitmap.GetInfo()
+        bmpstr = self.bitmap.GetBitmapBits(True)
+        return Image.frombuffer(
+            'RGB',
+            (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
+            bmpstr, 'raw', 'BGRX', 0, 1)
+
+    def GetHandler(pid: int) -> int:
+        handles = []
+
+        def WindowCallback(handle, handles):
+            if win32process.GetWindowThreadProcessId(handle)[1]== pid:
+                handles.append(handle)
+
+        def print(hwnd, extra):
+            print(win32gui.GetWindowText(hwnd))
+
+        win32gui.EnumWindows(WindowCallback, handles)
+
+        return handles[0]
+        
+
+    def GetGameState(self) -> GameState:
+        pass
+
+    def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int):
+        pass
+
+    
+
+    
     
 
 
@@ -107,4 +121,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    sap = SAP_API("")
+    while True:
+        sap.GetCapture().save("test.png")
+        input("Press Enter to continue...")
