@@ -2,6 +2,7 @@ import enum
 import win32gui
 import win32process
 
+import pytesseract as pyt
 from PIL import Image
 from PIL.Image import *
 from pywinauto.application import Application
@@ -12,6 +13,12 @@ from dataclasses import dataclass
 
 WIDTH = 1280
 HEIGHT = 720
+
+GOLD_CROP = (56,21,107,60)
+LIVES_CROP = (168,21,212,60)
+ROUNDS_CROP = (424,21,492,60)
+
+COST_CROP = (200,370,226,388)
 
 ARGS = f"-screen-width {WIDTH} -screen-height {HEIGHT} -screen-fullscreen 0"
 
@@ -38,6 +45,7 @@ class GameState():
     animalSlots: list[Image]
     shopSlots: list[Image]
     foodSlots: list[Image]
+
     gold: int
     lives: int
     round: int
@@ -161,7 +169,15 @@ class SAP_API:
         return handles[0]
 
     def GetGameState(self) -> GameState:
-        pass
+        capture = self.GetCapture()
+        
+        gold = capture.crop(GOLD_CROP)
+        lives = capture.crop(LIVES_CROP)
+        rounds = capture.crop(ROUNDS_CROP)
+        costs = capture.crop(COST_CROP)
+
+        state = GameState()
+
 
     def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int):
         pass
@@ -178,5 +194,6 @@ class SAP_API:
 
 if __name__ == '__main__':
     sap = SAP_API("")
-    
+    input("Press enter to continue...")
+    sap.GetGameState()
     
