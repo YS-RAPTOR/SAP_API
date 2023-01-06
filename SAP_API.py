@@ -3,6 +3,7 @@ import win32gui
 import win32process
 
 from PIL import Image
+from PIL.Image import *
 from pywinauto.application import Application
 from pywinauto.controls.hwndwrapper import HwndWrapper
 from time import sleep
@@ -56,7 +57,19 @@ class SAP_API:
     def GetCapture(self) -> Image:
         self.SAP.set_focus()
         sleep(0.1)
-        return self.SAP.capture_as_image()
+        return self.Crop(self.SAP.capture_as_image())
+
+    def Crop(self, img: Image):
+        horizontalToCrop = img.size[0] - WIDTH
+        verticalToCrop = img.size[1] - HEIGHT
+
+        left = horizontalToCrop // 2
+        right = left + WIDTH
+
+        top = verticalToCrop - left
+        bottom = HEIGHT + top
+
+        return img.crop((left, top, right, bottom))
 
     def GetHandler(pid: int) -> int:
         handles = []
@@ -71,7 +84,6 @@ class SAP_API:
         win32gui.EnumWindows(WindowCallback, handles)
 
         return handles[0]
-        
 
     def GetGameState(self) -> GameState:
         pass
@@ -91,3 +103,5 @@ class SAP_API:
 
 if __name__ == '__main__':
     sap = SAP_API("")
+    
+    
