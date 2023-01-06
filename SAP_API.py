@@ -32,14 +32,89 @@ class Results(enum.Enum):
 @dataclass
 class GameState():
     """Game state"""
-    # TODO: Add the game state variables
     # 5 animal slots, 5 shop slots, 2 food slots
     # Total slots is 12 slots. Store as Array of images
+    
+    animalSlots: list[Image]
+    shopSlots: list[Image]
+    foodSlots: list[Image]
     gold: int
     lives: int
     round: int
     cost: int
 
+    def __init__(self):
+        self.animalSlots = []
+        self.shopSlots = []
+        self.foodSlots = []
+
+        self.gold = 0
+        self.lives = 0
+        self.round = 0
+        self.cost = 0
+
+    def IsActionValid(self, action: ActionTypes, startSlot: int, endSlot: int) -> bool:
+        if(action == ActionTypes.SET):
+            # Check if the slot is available
+            availableShopSlots = self.GetAvailableShopSlots()
+            
+            # Check if the start slot is a shop slot
+            if(startSlot >= 5):
+                # Check if the shop slot is available
+                if(not availableShopSlots[startSlot - 5]):
+                    return False
+
+            # Check if the end slot is a shop slot
+            if(endSlot >= 5):
+                # Check if the shop slot is available
+                if(not availableShopSlots[endSlot - 5]):
+                    return False
+
+        elif(action == ActionTypes.SELL):
+            # Check if the slot is a shop slot
+            if(startSlot >= 5):
+                return False
+
+        elif(action == ActionTypes.FREEZE):
+            # Check if the slot is an animal slot
+            if(startSlot < 5):
+                return False
+
+        return True
+    
+    def GetAvailableShopSlots(self) -> list[bool]:
+        shopSlotsAvailable = [False] * 5
+        foodSlotsAvailable = [False] * 2
+
+        if(round >= 1):
+            shopSlotsAvailable[0] = True
+            shopSlotsAvailable[1] = True
+            shopSlotsAvailable[2] = True
+
+            foodSlotsAvailable[0] = True
+
+        if(round >= 3):
+            foodSlotsAvailable[1] = True
+        
+        if(round >= 5):
+            shopSlotsAvailable[3] = True
+
+        if(round >= 9):
+            shopSlotsAvailable[4] = True
+
+        shopSlotsAvailable.extend(foodSlotsAvailable)
+
+        return shopSlotsAvailable
+
+    def GetSlots(self) -> list[Image]:
+        slots = []
+        slots.extend(self.animalSlots)
+        slots.extend(self.shopSlots)    
+        slots.extend(self.foodSlots)
+        return slots
+
+    
+    
 class SAP_API:
     sapPath : str
     app: Application
