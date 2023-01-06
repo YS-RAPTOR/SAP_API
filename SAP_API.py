@@ -1,10 +1,10 @@
 import enum
-import win32gui
-import win32process
-
+import cv2
+import numpy as np
 import pytesseract as pyt
-from PIL import Image
-from PIL.Image import *
+import PIL.Image as PILImage
+
+from PIL.Image import Image
 from pywinauto.application import Application
 from pywinauto.controls.hwndwrapper import HwndWrapper
 from time import sleep
@@ -14,11 +14,15 @@ from dataclasses import dataclass
 WIDTH = 1280
 HEIGHT = 720
 
+# 70/40
+
 GOLD_CROP = (56,21,107,60)
 LIVES_CROP = (168,21,212,60)
 ROUNDS_CROP = (424,21,492,60)
-
 COST_CROP = (200,370,226,388)
+
+TESSERACT_CONFIG = '--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+
 
 ARGS = f"-screen-width {WIDTH} -screen-height {HEIGHT} -screen-fullscreen 0"
 
@@ -42,6 +46,7 @@ class GameState():
     # 5 animal slots, 5 shop slots, 2 food slots
     # Total slots is 12 slots. Store as Array of images
     
+    fullGame: Image
     animalSlots: list[Image]
     shopSlots: list[Image]
     foodSlots: list[Image]
@@ -121,7 +126,9 @@ class GameState():
         slots.extend(self.foodSlots)
         return slots
 
-    
+    def __str__(self) -> str:
+        return f"Gold: {self.gold}, Lives: {self.lives}, Round: {self.round}, Cost: {self.cost}"
+        
     
 class SAP_API:
     sapPath : str
@@ -142,7 +149,42 @@ class SAP_API:
         sleep(0.1)
         return self.Crop(self.SAP.capture_as_image())
 
-    def Crop(self, img: Image):
+    def GetGameState(self) -> GameState:
+        # Capture the game
+        capture = self.GetCapture()
+        
+        # Crop the game characters for OCR
+        gold = capture.crop(GOLD_CROP)
+        lives = capture.crop(LIVES_CROP)
+        rounds = capture.crop(ROUNDS_CROP)
+        costs = capture.crop(COST_CROP)
+
+        # Preprocess the images for OCR
+        gold = self.PreprocessForOCR(gold)
+        lives = self.PreprocessForOCR(lives)
+        rounds = self.PreprocessForOCR(rounds)
+
+        # Setup Game State
+        state = GameState()
+        state.fullGame = capture
+
+        # Use OCR
+        state.gold = self.ConvertToInt(gold, True)
+        state.lives = self.ConvertToInt(lives)
+        state.round = self.ConvertToInt(rounds)
+        state.cost = self.ConvertToInt(costs)
+
+        return state
+
+
+
+    def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int):
+        pass
+
+    
+
+    @staticmethod
+    def Crop(img: Image):
         horizontalToCrop = img.size[0] - WIDTH
         verticalToCrop = img.size[1] - HEIGHT
 
@@ -154,46 +196,31 @@ class SAP_API:
 
         return img.crop((left, top, right, bottom))
 
-    def GetHandler(pid: int) -> int:
-        handles = []
+    @staticmethod
+    def PreprocessForOCR(img: Image):
+        img = img.convert("L")
+        img = img.point(lambda p: 255 if p < 128 else 0)
+        img = cv2.floodFill(np.array(img), None, (0,0), 255)
+        img = PILImage.fromarray(img[1])
+        return img
 
-        def WindowCallback(handle, handles):
-            if win32process.GetWindowThreadProcessId(handle)[1]== pid:
-                handles.append(handle)
-
-        def print(hwnd, extra):
-            print(win32gui.GetWindowText(hwnd))
-
-        win32gui.EnumWindows(WindowCallback, handles)
-
-        return handles[0]
-
-    def GetGameState(self) -> GameState:
-        capture = self.GetCapture()
-        
-        gold = capture.crop(GOLD_CROP)
-        lives = capture.crop(LIVES_CROP)
-        rounds = capture.crop(ROUNDS_CROP)
-        costs = capture.crop(COST_CROP)
-
-        state = GameState()
-
-
-    def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int):
-        pass
-
-    
-
-    
-    
-
-
+    @staticmethod
+    def ConvertToInt(img: Image, ignoreErrors = False):
+        temp = pyt.image_to_string(img, config=TESSERACT_CONFIG)
+        if(temp != ""):
+            return int(temp)
+        elif(ignoreErrors):
+            return 0
+        else:
+            raise Exception("OCR returned nothing")
     
 
 
 
 if __name__ == '__main__':
     sap = SAP_API("")
-    input("Press enter to continue...")
-    sap.GetGameState()
-    
+
+    while True:
+        input()
+        print(sap.GetGameState())
+
