@@ -1,12 +1,11 @@
 import enum
-import subprocess
-import win32ui
 import win32gui
 import win32process
 
-from time import sleep
 from PIL import Image
-from ctypes import windll
+from pywinauto.application import Application
+from pywinauto.controls.hwndwrapper import HwndWrapper
+from time import sleep
 from HandleConfig import init
 from dataclasses import dataclass
 
@@ -41,53 +40,23 @@ class GameState():
     cost: int
 
 class SAP_API:
-    sapHandler : int
-    width: int
-    height: int
+    sapPath : str
+    app: Application
+    SAP : HwndWrapper
+    state: GameState
 
     def __init__(self, args: str = ARGS):
-        # Initialize the SAP Variables
-        sapPath = init() + " " + args
-
-        # Run SAP
-        sapPID = subprocess.Popen(sapPath).pid
-        sleep(5)
+        sapPath = init()
+        self.app = Application().start(f"{sapPath} {args}")
+        self.SAP = self.app.SuperAutoPets.wrapper_object()
         
-        # Get the window handle
-        self.sapHandler = SAP_API.GetHandler(sapPID)
-        
-        left, top, right, bot = win32gui.GetWindowRect(self.sapHandler)
-        self.width = right - left
-        self.height = bot - top
-
-        self.sapHandlerDC = win32gui.GetWindowDC(self.sapHandler)
-        self.sapUI_DC = win32ui.CreateDCFromHandle(self.sapHandlerDC)
-        self.saveDC = self.sapUI_DC.CreateCompatibleDC()
-
-        self.bitmap = win32ui.CreateBitmap()
-        self.bitmap.CreateCompatibleBitmap(self.sapUI_DC, self.width, self.height)
-
-        self.saveDC.SelectObject(self.bitmap)
-
     def __del__(self):
-        win32gui.DeleteObject(self.bitmap.GetHandle())
-        self.saveDC.DeleteDC()
-        self.sapUI_DC.DeleteDC()
-        win32gui.ReleaseDC(self.sapHandler, self.sapHandlerDC)
+        self.app.kill()
 
     def GetCapture(self) -> Image:
-        result = windll.user32.PrintWindow(self.sapHandler, self.saveDC.GetSafeHdc(), 1)
-
-        if result == 0:
-            return None
-        
-        #PrintWindow Succeeded
-        info = self.bitmap.GetInfo()
-        data = self.bitmap.GetBitmapBits(True)
-        return Image.frombuffer(
-            'RGB',
-            (info['bmWidth'], info['bmHeight']),
-            data, 'raw', 'BGRX', 0, 1)
+        self.SAP.set_focus()
+        sleep(0.1)
+        return self.SAP.capture_as_image()
 
     def GetHandler(pid: int) -> int:
         handles = []
@@ -122,6 +91,3 @@ class SAP_API:
 
 if __name__ == '__main__':
     sap = SAP_API("")
-    while True:
-        sap.GetCapture().save("test.png")
-        input("Press Enter to continue...")
