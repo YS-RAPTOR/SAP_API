@@ -14,17 +14,21 @@ from dataclasses import dataclass
 WIDTH = 1280
 HEIGHT = 720
 
-# 70/40
-
 GOLD_CROP = (56,21,107,60)
 LIVES_CROP = (168,21,212,60)
 ROUNDS_CROP = (424,21,492,60)
 COST_CROP = (200,370,226,388)
 
+ANIMAL_SLOTS_START = (300, 130)
+ANIMAL_SLOTS_SIZE = (96, 225)
+
+SHOP_SLOTS_START = (303, 380)
+SHOP_SLOTS_SIZE = (96, 170)
+
+FOOD_SLOTS_START = (783, 380)
+
 TESSERACT_CONFIG = '--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
-
-
-ARGS = f"-screen-width {WIDTH} -screen-height {HEIGHT} -screen-fullscreen 0"
+APP_ARGS = f"-screen-width {WIDTH} -screen-height {HEIGHT} -screen-fullscreen 0"
 
 class ActionTypes(enum.Enum):
     """Action types for the game"""
@@ -69,7 +73,7 @@ class GameState():
     def IsActionValid(self, action: ActionTypes, startSlot: int, endSlot: int) -> bool:
         if(action == ActionTypes.SET):
             # Check if the slot is available
-            availableShopSlots = self.GetAvailableShopSlots()
+            availableShopSlots = self.GetAllAvailableShopSlots()
             
             # Check if the start slot is a shop slot
             if(startSlot >= 5):
@@ -95,29 +99,44 @@ class GameState():
 
         return True
     
-    def GetAvailableShopSlots(self) -> list[bool]:
-        shopSlotsAvailable = [False] * 5
-        foodSlotsAvailable = [False] * 2
+    def GetNumberOfShopSlots(self) -> int:
+        noOfSlots = 0
 
         if(round >= 1):
-            shopSlotsAvailable[0] = True
-            shopSlotsAvailable[1] = True
-            shopSlotsAvailable[2] = True
-
-            foodSlotsAvailable[0] = True
-
-        if(round >= 3):
-            foodSlotsAvailable[1] = True
+            noOfSlots += 3
         
         if(round >= 5):
-            shopSlotsAvailable[3] = True
+            noOfSlots += 1
 
         if(round >= 9):
-            shopSlotsAvailable[4] = True
+            noOfSlots += 1
 
-        shopSlotsAvailable.extend(foodSlotsAvailable)
+        return noOfSlots
 
-        return shopSlotsAvailable
+    def GetNumberOfFoodSlots(self) -> int:
+        noOfSlots = 0
+
+        if(round >= 1):
+            noOfSlots += 1
+
+        if(round >= 3):
+            noOfSlots += 1
+
+        return noOfSlots
+
+    def GetAllAvailableShopSlots(self) -> list[bool]:
+        availableSlots = [False] * 7
+        noOfSlots = self.GetNumberOfShopSlots()
+
+        for i in range(noOfSlots):
+            availableSlots[i] = True
+
+        noOfSlots = self.GetNumberOfFoodSlots()
+
+        for i in range(5, 5 + noOfSlots):
+            availableSlots[i] = True
+
+        return availableSlots
 
     def GetSlots(self) -> list[Image]:
         slots = []
@@ -128,7 +147,10 @@ class GameState():
 
     def __str__(self) -> str:
         return f"Gold: {self.gold}, Lives: {self.lives}, Round: {self.round}, Cost: {self.cost}"
-        
+    
+    def DumpStateImages(self):
+        for i ,img in enumerate(self.GetSlots()):
+            img.save(f"slot{i}.png")
     
 class SAP_API:
     sapPath : str
@@ -136,7 +158,7 @@ class SAP_API:
     SAP : HwndWrapper
     state: GameState
 
-    def __init__(self, args: str = ARGS):
+    def __init__(self, args: str = APP_ARGS):
         sapPath = init()
         self.app = Application().start(f"{sapPath} {args}")
         self.SAP = self.app.SuperAutoPets.wrapper_object()
@@ -174,14 +196,15 @@ class SAP_API:
         state.round = self.ConvertToInt(rounds)
         state.cost = self.ConvertToInt(costs)
 
+        # Get the slots
+        state.animalSlots = self.GetSlots(capture, ANIMAL_SLOTS_START, ANIMAL_SLOTS_SIZE, 5)
+        state.shopSlots = self.GetSlots(capture, SHOP_SLOTS_START, SHOP_SLOTS_SIZE, state.GetNumberOfShopSlots())
+        state.foodSlots = self.GetSlots(capture, FOOD_SLOTS_START, SHOP_SLOTS_SIZE, state.GetNumberOfFoodSlots())
+
         return state
-
-
 
     def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int):
         pass
-
-    
 
     @staticmethod
     def Crop(img: Image):
@@ -214,7 +237,20 @@ class SAP_API:
         else:
             raise Exception("OCR returned nothing")
     
+    @staticmethod
+    def GetSlots(img: Image, start : tuple[int, int], size: tuple[int, int], noOfSlots ) -> list[Image]:
+        slots = []
 
+        left, top = start
+        bottom = top + size[1]
+        for i in range(noOfSlots):
+            right = left + size[0]
+
+            slot = img.crop((left, top, right, bottom))
+            slots.append(slot)
+            left = right
+
+        return slots
 
 
 if __name__ == '__main__':
