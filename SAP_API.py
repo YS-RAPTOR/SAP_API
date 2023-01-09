@@ -1,15 +1,35 @@
 import enum
 import cv2
+import io
 import numpy as np
+
 import pytesseract as pyt
 import PIL.Image as PILImage
 
+from time import sleep
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 from PIL.Image import Image
 from dataclasses import dataclass
+
+# Selenium Tags
+
+RUN_GAME_CLASS_NAME = "load_iframe_btn"
+GAME_ID = "game_drop"
+
+
+# Constants
 
 WIDTH = 1280
 HEIGHT = 720
 
+# Crop coordinates
 GOLD_CROP = (56,21,107,60)
 LIVES_CROP = (168,21,212,60)
 ROUNDS_CROP = (424,21,492,60)
@@ -23,8 +43,9 @@ SHOP_SLOTS_SIZE = (96, 170)
 
 FOOD_SLOTS_START = (783, 380)
 
+# Configs
 TESSERACT_CONFIG = '--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
-APP_ARGS = f"-screen-width {WIDTH} -screen-height {HEIGHT} -screen-fullscreen 0"
+URL = "https://teamwood.itch.io/super-auto-pets"
 
 class ActionTypes(enum.Enum):
     """Action types for the game"""
@@ -149,21 +170,64 @@ class GameState():
             img.save(f"slot{i}.png")
     
 class SAP_API:
-    sapPath : str
     state: GameState
+    sap : WebElement
+    window: str
+    driver: webdriver.Chrome
+    wait : WebDriverWait
 
-    def __init__(self, args: str = APP_ARGS):
-        pass
+    def __init__(self, driver: webdriver.Chrome, window: str):
+        # Add Options
+        self.driver = driver
+        self.window = window
+        self.wait = WebDriverWait(self.driver, 60)
+
+        self.driver.get(URL)
+
+        # Get the Run Game Option
+        runGameButton : WebElement = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, RUN_GAME_CLASS_NAME ))) 
+        runGameButton.click()
+
+        # Get the SAP Window
+        self.sap : WebElement = self.wait.until(EC.presence_of_element_located((By.ID, GAME_ID)))
         
     def __del__(self):
-        self.app.kill()
+        self.driver.switch_to.window(self.window)
+        self.driver.close()
 
-    def GetCapture(self) -> Image:
-        self.SAP.set_focus()
-        return self.Crop(self.SAP.capture_as_image())
+    def GetCapture(self) -> Image:  
+        # Get the game capture
+        return PILImage.open(io.BytesIO(self.sap.screenshot_as_png))
 
-    #TODO - Add Setting Initializations and automation
-    #TODO - Find way to automate login/logout process
+    def IsFinishedDownloading(self) -> bool:
+        # Check if the game is finished downloading
+        img = self.GetCapture()
+
+        # When Loading Background is Black
+        px = img.getpixel((0, 0))
+        if(px[0] < 20 and px[1] < 20 and px[2] < 20):
+            return False
+        
+        return True
+
+    def GetToMenu(self) -> None:
+        """Will get the game to the menu. Also makes sure the player is unique"""
+
+        # Wait for the game to finish downloading
+        while(not self.IsFinishedDownloading()):
+            sleep(10)
+
+        # Accept EULA
+
+
+
+        # If Logging in automatically ? Relogin as Guest : Login as Guest
+
+        
+
+        
+
+    
     #TODO - Find way to figure out if you are in the menu
     #TODO - Find way to figure out if you are in the game
     #TODO - Find way to start the game
@@ -204,19 +268,6 @@ class SAP_API:
         pass
 
     @staticmethod
-    def Crop(img: Image):
-        horizontalToCrop = img.size[0] - WIDTH
-        verticalToCrop = img.size[1] - HEIGHT
-
-        left = horizontalToCrop // 2
-        right = left + WIDTH
-
-        top = verticalToCrop - left
-        bottom = HEIGHT + top
-
-        return img.crop((left, top, right, bottom))
-
-    @staticmethod
     def PreprocessForOCR(img: Image):
         img = img.convert("L")
         img = img.point(lambda p: 255 if p < 128 else 0)
@@ -251,15 +302,12 @@ class SAP_API:
 
 
 if __name__ == '__main__':
-    sap = SAP_API("")
+    options = Options()
+    driver = webdriver.Chrome(service = Service(ChromeDriverManager().install()), options= options)
+    driver.maximize_window()
 
-    val = (0,0)
+    sap = SAP_API(driver, driver.current_window_handle)
+    sap.GetToMenu()
 
     while True:
-        img = sap.GetCapture()
-        img.getpixel(val)
-
-        if(img.getpixel(val) != (0, 0, 0)):
-            pass
-
-    print("In Menu")
+        input("Press Enter to continue...")
