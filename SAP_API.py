@@ -5,10 +5,6 @@ import pytesseract as pyt
 import PIL.Image as PILImage
 
 from PIL.Image import Image
-from pywinauto.application import Application
-from pywinauto.controls.hwndwrapper import HwndWrapper
-from time import sleep
-from HandleConfig import init
 from dataclasses import dataclass
 
 WIDTH = 1280
@@ -154,22 +150,23 @@ class GameState():
     
 class SAP_API:
     sapPath : str
-    app: Application
-    SAP : HwndWrapper
     state: GameState
 
     def __init__(self, args: str = APP_ARGS):
-        sapPath = init()
-        self.app = Application().start(f"{sapPath} {args}")
-        self.SAP = self.app.SuperAutoPets.wrapper_object()
+        pass
         
     def __del__(self):
         self.app.kill()
 
     def GetCapture(self) -> Image:
         self.SAP.set_focus()
-        sleep(0.1)
         return self.Crop(self.SAP.capture_as_image())
+
+    #TODO - Add Setting Initializations and automation
+    #TODO - Find way to automate login/logout process
+    #TODO - Find way to figure out if you are in the menu
+    #TODO - Find way to figure out if you are in the game
+    #TODO - Find way to start the game
 
     def GetGameState(self) -> GameState:
         # Capture the game
@@ -256,7 +253,13 @@ class SAP_API:
 if __name__ == '__main__':
     sap = SAP_API("")
 
-    while True:
-        input()
-        print(sap.GetGameState())
+    val = (0,0)
 
+    while True:
+        img = sap.GetCapture()
+        img.getpixel(val)
+
+        if(img.getpixel(val) != (0, 0, 0)):
+            pass
+
+    print("In Menu")
