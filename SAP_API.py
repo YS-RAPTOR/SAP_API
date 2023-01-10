@@ -7,25 +7,23 @@ import pytesseract as pyt
 import PIL.Image as PILImage
 
 from time import sleep
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from PIL.Image import Image
+from selenium import webdriver
 from dataclasses import dataclass
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support import expected_conditions as EC
 
 # Selenium Tags
-
 RUN_GAME_CLASS_NAME = "load_iframe_btn"
 GAME_ID = "game_drop"
 
-
 # Constants
-
 WIDTH = 1280
 HEIGHT = 720
 
@@ -44,7 +42,8 @@ SHOP_SLOTS_SIZE = (96, 170)
 FOOD_SLOTS_START = (783, 380)
 
 # Configs
-TESSERACT_CONFIG = '--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+TESSERACT_CONFIG_NUM = '--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
+TESSERACT_CONFIG_CHAR = '--psm 11 --oem 3 -c tessedit_char_whitelist=QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm '
 URL = "https://teamwood.itch.io/super-auto-pets"
 
 class ActionTypes(enum.Enum):
@@ -184,12 +183,17 @@ class SAP_API:
 
         self.driver.get(URL)
 
+        #TODO Clear Index DB FILE_DATA
+        
+
         # Get the Run Game Option
         runGameButton : WebElement = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, RUN_GAME_CLASS_NAME ))) 
         runGameButton.click()
 
+
         # Get the SAP Window
         self.sap : WebElement = self.wait.until(EC.presence_of_element_located((By.ID, GAME_ID)))
+
         
     def __del__(self):
         self.driver.switch_to.window(self.window)
@@ -213,20 +217,34 @@ class SAP_API:
     def GetToMenu(self) -> None:
         """Will get the game to the menu. Also makes sure the player is unique"""
 
-        # Wait for the game to finish downloading
-        while(not self.IsFinishedDownloading()):
+        capture = self.GetCapture()
+
+        # Check if EULA is UP
+        while(not self.CanFindString(capture, "consent")):
+            self.sap.click()
+            capture = self.GetCapture()
             sleep(10)
-
+        
         # Accept EULA
+        loc = self.FindLocationOfString(capture, "Accept")
+        self.PerformClick(loc)
 
-
-
-        # If Logging in automatically ? Relogin as Guest : Login as Guest
-
+        # Check if Login screen is up
+        while(not self.CanFindString(capture, "Guest", TESSERACT_CONFIG_CHAR)):
+            capture = self.GetCapture()
+            sleep(1)
         
+        # Login as Guest
+        self.PerformClick(self.FindLocationOfString(capture, "Guest", TESSERACT_CONFIG_CHAR))
 
+        # Check if News is up
+        while(not self.CanFindString(self.PreprocessForOCR(capture), "News", TESSERACT_CONFIG_CHAR)):
+            capture = self.GetCapture()
+            sleep(1)
+
+        # Dismiss News
+        self.PerformClick((-500, 50))
         
-
     
     #TODO - Find way to figure out if you are in the menu
     #TODO - Find way to figure out if you are in the game
@@ -264,8 +282,42 @@ class SAP_API:
 
         return state
 
+    def PerformClick(self, coord : tuple[int, int]):
+        ActionChains(self.driver).move_to_element_with_offset(self.sap, coord[0], coord[1]).click().perform()
+
     def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int):
         pass
+
+    @staticmethod
+    def CanFindString(capture: Image, find : str, config = "") -> bool:
+        # Check if the String can be found
+        capStr : str = pyt.image_to_string(capture, config = config)
+        capStr = capStr.lower()
+        if(capStr.find(find.lower()) != -1):
+            return True
+        
+        return False
+
+    @staticmethod
+    def FindLocationOfString(capture : Image, find : str, config = "") -> tuple[int,int]:
+        boxes : list[str] = pyt.image_to_boxes(capture, config = config).split("\n")
+        
+        # Make String from Boxes
+        string = ""
+        for box in boxes:    
+            string += box.split(" ")[0]
+
+        # Find Index of string to find
+        string = string.lower()
+        idx = string.find(find.lower())
+
+        # Cannot Find String
+        if(idx == -1):
+            return None
+
+        # return the box location
+        x, y = tuple(boxes[idx].split(" ")[3:5])
+        return (int(x) - (WIDTH // 2), (HEIGHT // 2) - int(y))
 
     @staticmethod
     def PreprocessForOCR(img: Image):
@@ -277,7 +329,7 @@ class SAP_API:
 
     @staticmethod
     def ConvertToInt(img: Image, ignoreErrors = False):
-        temp = pyt.image_to_string(img, config=TESSERACT_CONFIG)
+        temp = pyt.image_to_string(img, config=TESSERACT_CONFIG_NUM)
         if(temp != ""):
             return int(temp)
         elif(ignoreErrors):
@@ -311,3 +363,4 @@ if __name__ == '__main__':
 
     while True:
         input("Press Enter to continue...")
+
