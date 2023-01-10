@@ -28,15 +28,17 @@ GAME_ID = "game_drop"
 WIDTH = 1280
 HEIGHT = 720
 ACTION_DELAY = 10
+GOLD_PIXEL_COLOR = (255, 171, 50, 255)
 
 # Crop coordinates
 GOLD_CROP = (56,21,107,60)
 LIVES_CROP = (168,21,212,60)
 ROUNDS_CROP = (424,21,492,60)
-# COST_CROP = (200,370,226,388)
+
+GOLD_PIXEL = (30, 40)
 
 RESULTS_CROP = (0, 450, WIDTH, 520)
-AUTOPLAY_CROP = (580, 0, 700, 50)
+PLAY_PAUSE_CROP = (460, 0, 575, 50)
 
 ANIMAL_SLOTS_START = (300, 130)
 ANIMAL_SLOTS_SIZE = (96, 225)
@@ -51,6 +53,8 @@ FOOD_SLOTS_START = (783, 380)
 END_ROUND_BUTTON = (600, 300)
 ROLL_BUTTON = (-600, 300)
 FREEZE_SELL_BUTTON = (100, 300)
+
+LATER_BUTTON = (-100, 300)
 
 SETTINGS = [(600, -300),
             (-600, -250),
@@ -69,7 +73,7 @@ SETTINGS = [(600, -300),
             (0, -250),
             (0, 0)]
 
-ROUND_SETTINGS = [(0, 0), (0, 0), (0, 0), (0, -300), (100, -300)]
+ROUND_SETTINGS = [(0, -300), (100, -300)]
 
 # Configs
 TESSERACT_CONFIG_NUM = '--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
@@ -114,7 +118,7 @@ class GameState():
         self.EMPTY_SLOTS = []
         
         for i in range(12):
-            self.EMPTY_SLOTS.append(np.array(PILImage.open(f"EmptySlots/slot{i}.png")))
+            self.EMPTY_SLOTS.append(np.array(PILImage.open(f"Assets/EmptySlots/slot{i}.png")))
 
         self.gold = 0
         self.lives = 0
@@ -261,7 +265,7 @@ class SAP_API:
     result : Results
 
     def __init__(self, driver: webdriver.Chrome, window: str):
-        self.close = np.array(PILImage.open("close.png"))
+        self.close = np.array(PILImage.open("Assets/close.png"))
         self.state = GameState()
 
         self.driver = driver
@@ -313,16 +317,7 @@ class SAP_API:
         # Initialize Settings
         self.PerformClicks(SETTINGS)
 
-        self.PerformClick((0 , 0))
-
-        capture = self.GetCapture()
-        px = (0, 0, 0)
-
-        # Check if in the game
-        while(px[2] < 128):
-            capture = self.GetCapture()
-            px = capture.getpixel((0, 0))
-            sleep(1)
+        self.MenuToGame()
 
         self.CloseHints()
 
@@ -372,6 +367,18 @@ class SAP_API:
         # Dismiss News
         self.PerformClick((-500, 50))
     
+    def MenuToGame(self):
+        self.PerformClick((0 , 0))
+
+        capture = self.GetCapture()
+        px = (0, 0, 0)
+
+        # Check if in the game
+        while(px != GOLD_PIXEL_COLOR):
+            capture = self.GetCapture()
+            px = capture.getpixel(GOLD_PIXEL)
+            sleep(1)
+
     def CloseHints(self):
         # Close Hints found in the game
         while(True):
@@ -442,17 +449,61 @@ class SAP_API:
     
     def EndRound(self):
         self.PerformClick(END_ROUND_BUTTON)
-
+        
+        skip = False
         # Check if Match Screen is up
-        for _ in range(ACTION_DELAY):
-            if(self.CanFindString(self.GetCapture().crop(AUTOPLAY_CROP), "autoplay", TESSERACT_CONFIG_CHAR)):
+        while(not self.CanFindString(self.GetCapture().crop(PLAY_PAUSE_CROP), "P", TESSERACT_CONFIG_CHAR)):
+            # If you see results screen, skip initialization for this round.
+            if self.GetResult():
+                skip = True
                 break
 
-        if(not self.isInitialized):
-            self.PerformClicks(ROUND_SETTINGS, 0.5)
+        # Setup AutoPlay and Fast Forward
+        if(not self.isInitialized and not skip):
+            self.PerformClicks(ROUND_SETTINGS)
             self.isInitialized = True
 
-        self.GetResult()
+        # Get Outcomes for the Round
+        while not self.GetResult():
+            sleep(1)
+
+        self.BringBackToGame()
+
+    def GetResult(self) -> bool:
+        capture = self.GetCapture().crop(RESULTS_CROP)
+        capStr : str = pyt.image_to_string(capture, config = TESSERACT_CONFIG_CHAR)
+        capStr = capStr.lower()
+
+        if(capStr.find("defeat") != -1):
+            self.result = Results.LOSE
+            return True
+        elif(capStr.find("victory") != -1):
+            self.result = Results.WIN
+            return True
+        elif(capStr.find("draw") != -1):
+            self.result = Results.DRAW
+            return True
+        elif(capStr.find("gamewon") != -1):
+            self.result = Results.WIN
+            return True
+        elif(capStr.find("gameover") != -1):
+            self.result = Results.LOSE
+            return True
+        else:
+            return False
+
+
+    def BringBackToGame(self):
+        capture = self.GetCapture()
+        while True:
+            if(capture.getpixel(GOLD_PIXEL) == GOLD_PIXEL_COLOR):
+                return
+            elif(self.CanFindString(capture, "Guest"), TESSERACT_CONFIG_CHAR):
+                self.PerformClick(LATER_BUTTON)
+
+            self.PerformClick((0, 0))
+            capture = self.GetCapture()
+            sleep(1)
 
     def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int) -> bool:
         for i in range(2):
@@ -470,6 +521,8 @@ class SAP_API:
                 self.Roll()
             elif(action == ActionTypes.END):
                 self.EndRound()
+                return True
+
 
             sleep(ACTION_DELAY)
             
@@ -483,24 +536,6 @@ class SAP_API:
             return True
 
         return False
-        
-    def GetResult(self):
-        capture = self.GetCapture().crop(RESULTS_CROP)
-        while(True):
-            capStr : str = pyt.image_to_string(capture, config = TESSERACT_CONFIG_CHAR)
-            capStr = capStr.lower()
-            if(capStr.find("defeat") != -1):
-                self.result = Results.LOSE
-                return
-            elif(capStr.find("victory") != -1):
-                self.result = Results.WIN
-                return
-            elif(capStr.find("draw") != -1):
-                self.result = Results.DRAW
-                return
-
-            capture = self.GetCapture().crop(RESULTS_CROP)
-            sleep(1)
 
     @staticmethod
     def CanFindString(capture: Image, find : str, config = "") -> bool:
@@ -576,13 +611,10 @@ if __name__ == '__main__':
 
     sap.InitializeGame()
 
-    # #TODO Setup Match End
-
     while True:
         state = sap.GetGameState()
         print(state)
         action = input("Enter Action (S - Set, L - Sell, F - Freeze, R - Roll, E - End, Q - Quit): ")
-
         if(action == "S"):
             start = int(input("Enter Start Slot: "))
             end = int(input("Enter End Slot: "))
@@ -603,5 +635,3 @@ if __name__ == '__main__':
 
         if(not status):
             print("Invalid Action")
-
-        print("\n" * 5)
