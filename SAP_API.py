@@ -33,7 +33,7 @@ HEIGHT = 720
 GOLD_CROP = (56,21,107,60)
 LIVES_CROP = (168,21,212,60)
 ROUNDS_CROP = (424,21,492,60)
-COST_CROP = (200,370,226,388)
+# COST_CROP = (200,370,226,388)
 
 ANIMAL_SLOTS_START = (300, 130)
 ANIMAL_SLOTS_SIZE = (96, 225)
@@ -101,7 +101,6 @@ class GameState():
     gold: int
     lives: int
     round: int
-    cost: int
 
     def __init__(self):
         self.animalSlots = []
@@ -111,7 +110,6 @@ class GameState():
         self.gold = 0
         self.lives = 0
         self.round = 0
-        self.cost = 0
 
     def IsActionValid(self, action: ActionTypes, startSlot: int, endSlot: int) -> bool:
         if(action == ActionTypes.SET):
@@ -210,7 +208,7 @@ class GameState():
         return True
 
     def __str__(self) -> str:
-        return f"Gold: {self.gold}, Lives: {self.lives}, Round: {self.round}, Cost: {self.cost}"
+        return f"Gold: {self.gold}, Lives: {self.lives}, Round: {self.round}"
     
     def DumpStateImages(self):
         for i ,img in enumerate(self.GetSlots()):
@@ -272,7 +270,7 @@ class SAP_API:
         px = (0, 0, 0)
 
         # Check if in the game
-        while(px != (95, 201, 247, 255)):
+        while(px[2] < 128):
             capture = self.GetCapture()
             px = capture.getpixel((0, 0))
             sleep(1)
@@ -331,21 +329,21 @@ class SAP_API:
             res = cv2.matchTemplate(self.close, np.array(self.GetCapture()), cv2.TM_CCOEFF_NORMED)
             loc = np.where(res >= 0.9)
 
-            if(len(loc) == 0):
+            if(len(loc[0]) == 0 or len(loc[1]) == 0):
                 break
 
-            self.PerformClick((loc[0] + self.close.shape[0], loc[1] + self.close.shape[1]))
+            self.PerformClick(((loc[1][0] + 2) - (WIDTH//2), (loc[0][0] + 2) - (HEIGHT // 2)))
             sleep(2)
 
     def GetGameState(self) -> GameState:
         for _ in range(5):
-            self.performClick((0, 0))
+            self.PerformClick((0, 0))
             sleep(0.1)
 
         self.CloseHints()
 
         for _ in range(3):
-            self.performClick((0, 0))
+            self.PerformClick((0, 0))
             sleep(0.1)
 
         # Capture the game
@@ -355,7 +353,7 @@ class SAP_API:
         gold = capture.crop(GOLD_CROP)
         lives = capture.crop(LIVES_CROP)
         rounds = capture.crop(ROUNDS_CROP)
-        costs = capture.crop(COST_CROP)
+        # costs = capture.crop(COST_CROP)
 
         # Preprocess the images for OCR
         gold = self.PreprocessForOCR(gold)
@@ -370,7 +368,6 @@ class SAP_API:
         self.state.gold = self.ConvertToInt(gold, True)
         self.state.lives = self.ConvertToInt(lives)
         self.state.round = self.ConvertToInt(rounds)
-        self.state.cost = self.ConvertToInt(costs)
 
         # Get the slots
         self.state.animalSlots = self.GetSlots(capture, ANIMAL_SLOTS_START, ANIMAL_SLOTS_SIZE, 5)
