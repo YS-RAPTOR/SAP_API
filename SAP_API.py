@@ -334,7 +334,7 @@ class SAP_API:
             if(len(loc) == 0):
                 break
 
-            self.PerformClick((loc[0] + self.close.size[0], loc[1] + self.close.size[1]))
+            self.PerformClick((loc[0] + self.close.shape[0], loc[1] + self.close.shape[1]))
             sleep(2)
 
     def GetGameState(self) -> GameState:
