@@ -2,15 +2,18 @@ import enum
 import cv2
 import io
 import cv2  
+import os
 import numpy as np
-
 import pytesseract as pyt
 import PIL.Image as PILImage
 
+import time
 from time import sleep
+from typing import Self
 from PIL.Image import Image
-from selenium import webdriver
 from dataclasses import dataclass
+
+from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -95,30 +98,21 @@ class Results(enum.Enum):
     WIN = 1
 
 @dataclass
-class GameState():
+class GameState:
     """Game state"""
     # 5 animal slots, 5 shop slots, 2 food slots
     # Total slots is 12 slots. Store as Array of images
-    
-    fullGame: Image
-    animalSlots: list[Image]
-    shopSlots: list[Image]
-    foodSlots: list[Image]
-
-    EMPTY_SLOTS: list[np.ndarray]
-
-    gold: int
-    lives: int
-    round: int
+    __EMPTY_SLOTS = []
 
     def __init__(self):
-        self.animalSlots = []
-        self.shopSlots = []
-        self.foodSlots = []
-        self.EMPTY_SLOTS = []
+        self.fullGame : Image = None
+
+        self.animalSlots : list[Image] = []
+        self.shopSlots : list[Image] = []
+        self.foodSlots : list[Image] = []
         
         for i in range(12):
-            self.EMPTY_SLOTS.append(np.array(PILImage.open(f"Assets/EmptySlots/slot{i}.png")))
+            self.__EMPTY_SLOTS.append(np.array(PILImage.open(f"Assets/EmptySlots/slot{i}.png")))
 
         self.gold = 0
         self.lives = 0
@@ -140,26 +134,47 @@ class GameState():
             return False
 
         for slot in range(len(slots)):
+
+            if(slots[slot] == None and otherSlots[slot] == None):
+                # If both is none then continue
+                continue
+            elif(slots[slot] == None or otherSlots[slot] == None):
+                # If one is none but the other is not then return false
+                return False
+
             res = cv2.matchTemplate(np.array(slots[slot]), np.array(otherSlots[slot]), cv2.TM_CCOEFF_NORMED)
-            loc = np.where(res >= 0.9)
+            loc = np.where(res >= 0.99)
 
             if(len(loc[0]) == 0 or len(loc[1]) == 0):
                 return False
 
         return True
 
+    def __str__(self) -> str:
+        return f"Gold: {self.gold}\nLives: {self.lives}\nRound: {self.round}"
+
+    def copy(self) -> Self:
+        c = GameState()
+
+        c.fullGame = self.fullGame.copy()
+        c.animalSlots = self.animalSlots.copy()
+        c.shopSlots = self.shopSlots.copy()
+        c.foodSlots = self.foodSlots.copy()
+
+        c.gold = self.gold
+        c.lives = self.lives
+        c.round = self.round
+
     def IsActionValid(self, action: ActionTypes, startSlot: int, endSlot: int) -> bool:
         if(action == ActionTypes.SET):
-            # Check if the slot is available
-            availableShopSlots = self.GetAllAvailableShopSlots()
-            
+            # Check if the start slot is the same as the end slot
             if(startSlot == endSlot):
                 return False
 
             # Check if the start slot is a shop slot
             if(startSlot >= 5):
                 # Check if the shop slot is available
-                if(not availableShopSlots[startSlot - 5]):
+                if(not self.GetAllAvailableShopSlots()[startSlot - 5]):
                     return False
 
             # Check if the end slot is a shop slot
@@ -184,8 +199,17 @@ class GameState():
             if(startSlot < 5):
                 return False
 
+            # Check if the Shop Slot is available
+            if(not self.GetAllAvailableShopSlots()[startSlot - 5]):
+                return False
+
             # Check if the slot is empty
             if(self.IsSlotEmpty(startSlot)):
+                return False
+                
+        elif(action == ActionTypes.ROLL):
+            # No Gold to reroll
+            if(self.gold == 0):
                 return False
 
         return True
@@ -224,7 +248,7 @@ class GameState():
 
         noOfSlots = self.GetNumberOfFoodSlots()
 
-        for i in range(5, 5 + noOfSlots):
+        for i in range(6, 6 - noOfSlots, -1):
             availableSlots[i] = True
 
         return availableSlots
@@ -232,76 +256,93 @@ class GameState():
     def GetSlots(self) -> list[Image]:
         slots = []
         slots.extend(self.animalSlots)
-        slots.extend(self.shopSlots)    
+        slots.extend(self.shopSlots)
+        slots.extend([None] * ((5 - self.GetNumberOfShopSlots()) + (2 - self.GetNumberOfFoodSlots())))    
         slots.extend(self.foodSlots)
+
         return slots
 
     def IsSlotEmpty(self, slot: int) -> bool:
-        res = cv2.matchTemplate(self.EMPTY_SLOTS[slot], np.array(self.GetSlots()[slot]), cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(self.__EMPTY_SLOTS[slot], np.array(self.GetSlots()[slot]), cv2.TM_CCOEFF_NORMED)
         loc = np.where(res >= 0.85)
 
         if(len(loc[0]) == 0 or len(loc[1]) == 0):
             return False
 
         return True
-
-    def __str__(self) -> str:
-        return f"Gold: {self.gold}, Lives: {self.lives}, Round: {self.round}"
     
-    def DumpStateImages(self):
-        for i ,img in enumerate(self.GetSlots()):
-            img.save(f"slot{i}.png")
+    def DumpState(self, directory = ""):   
+        
+        if(directory != ""):
+            directory += "/"
+
+        if(not os.path.exists(directory) and not directory == ""):
+            os.makedirs(directory)
+
+        # txt File with information
+        with open(f"{directory}state.txt", "w") as f:
+            f.write(str(self))
+
+        # Images of the slots
+        self.fullGame.save(f"{directory}fullGame.png")
+
+        for i, animal in enumerate(self.animalSlots):
+            animal.save(f"{directory}animal{i}.png")
+
+        for i, shop in enumerate(self.shopSlots):
+            shop.save(f"{directory}shop{i}.png")
+
+        for i, food in enumerate(self.foodSlots):
+            food.save(f"{directory}food{i}.png")
     
 class SAP_API:
-    state: GameState
-    sap : WebElement
-    window: str
-    driver: webdriver.Chrome
-    wait : WebDriverWait
-    SLOT_LOCATIONS : list[tuple[int, int]]
-    close : np.ndarray
-    isInitialized = False
+    __SLOT_LOCATIONS : list[tuple[int, int]] = []
+    __close : np.ndarray = None
 
-    result : Results
+    def __init__(self):
+        # Setup Static Variables
+        if(self.__close == None):
+            self.__close = np.array(PILImage.open("Assets/close.png"))
 
-    def __init__(self, driver: webdriver.Chrome, window: str):
-        self.close = np.array(PILImage.open("Assets/close.png"))
-        self.state = GameState()
+        if(len(self.__SLOT_LOCATIONS) == 0):
+            self.__CreateSlotLocs()
+        
+        # Initialize Variables
+        self.__isInitialized = False
+        self.__state = None
+        self.__prevState = None
 
-        self.driver = driver
-        self.window = window
-        self.wait = WebDriverWait(self.driver, 60)
-
-        self.driver.get(URL)
-
-        self.CreateSlotLocs()
+        options = Options()
+        options.add_argument("--mute-audio")
+        self.__driver : webdriver.Chrome = webdriver.Chrome(service = Service(ChromeDriverManager().install()), options= options)
+        self.__driver.maximize_window()
+        wait = WebDriverWait(self.__driver, 60)
+        self.__driver.get(URL)
 
         # Get the Run Game Option
-        runGameButton : WebElement = self.wait.until(EC.element_to_be_clickable((By.CLASS_NAME, RUN_GAME_CLASS_NAME ))) 
+        runGameButton : WebElement = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, RUN_GAME_CLASS_NAME ))) 
         runGameButton.click()
 
         # Get the SAP Window
-        self.sap : WebElement = self.wait.until(EC.presence_of_element_located((By.ID, GAME_ID)))
+        self.__sap : WebElement = wait.until(EC.presence_of_element_located((By.ID, GAME_ID)))
         
     def __del__(self):
-        self.driver.switch_to.window(self.window)
-        self.driver.close()
+        self.__driver.quit()
 
-    def CreateSlotLocs(self):
-        self.SLOT_LOCATIONS = []
+    def __CreateSlotLocs(self):
         # Animal Slots
         for i in range(5):
             i += 0.5
             x = (ANIMAL_SLOTS_START[0] + i * ANIMAL_SLOTS_SIZE[0]) - (WIDTH // 2) 
             y = (ANIMAL_SLOTS_START[1] + ANIMAL_SLOTS_SIZE[1] // 2) - (HEIGHT // 2)
-            self.SLOT_LOCATIONS.append((x, y))
+            self.__SLOT_LOCATIONS.append((x, y))
 
         # Animal Shop
         for i in range(5):
             i += 0.5
             x = (SHOP_SLOTS_START[0] + i * SHOP_SLOTS_SIZE[0]) - (WIDTH // 2)
             y = (SHOP_SLOTS_START[1] + SHOP_SLOTS_SIZE[1] // 2) - (HEIGHT // 2)
-            self.SLOT_LOCATIONS.append((x, y))
+            self.__SLOT_LOCATIONS.append((x, y))
 
 
         # Food Shop
@@ -309,95 +350,84 @@ class SAP_API:
             i += 0.5
             x = (FOOD_SLOTS_START[0] + i * SHOP_SLOTS_SIZE[0]) - (WIDTH // 2)
             y = (FOOD_SLOTS_START[1] + SHOP_SLOTS_SIZE[1] // 2) - (HEIGHT // 2)
-            self.SLOT_LOCATIONS.append((x, y))
+            self.__SLOT_LOCATIONS.append((x, y))
 
     def InitializeGame(self):
         # Get the game to the menu
-        self.GetToMenu()
+        self.__GetToMenu()
         # Initialize Settings
-        self.PerformClicks(SETTINGS)
+        self.__PerformClicks(SETTINGS)
 
-        self.MenuToGame()
+        self.__MenuToGame()
 
-        self.CloseHints()
+        self.__CloseHints()
 
-    def GetCapture(self) -> Image:  
+    def __GetCapture(self) -> Image:  
         # Get the game capture
-        return PILImage.open(io.BytesIO(self.sap.screenshot_as_png))
+        return PILImage.open(io.BytesIO(self.__sap.screenshot_as_png))
 
-    def IsFinishedDownloading(self) -> bool:
-        # Check if the game is finished downloading
-        img = self.GetCapture()
-
-        # When Loading Background is Black
-        px = img.getpixel((0, 0))
-        if(px[0] < 20 and px[1] < 20 and px[2] < 20):
-            return False
-        
-        return True
-
-    def GetToMenu(self) -> None:
+    def __GetToMenu(self) -> None:
         """Will get the game to the menu."""
 
-        capture = self.GetCapture()
+        capture = self.__GetCapture()
 
         # Check if EULA is UP
         while(not self.CanFindString(capture, "consent")):
-            self.sap.click()
-            capture = self.GetCapture()
+            self.__sap.click()
+            capture = self.__GetCapture()
             sleep(10)
         
         # Accept EULA
         loc = self.FindLocationOfString(capture, "Accept")
-        self.PerformClick(loc)
+        self.__PerformClick(loc)
 
         # Check if Login screen is up
         while(not self.CanFindString(capture, "Guest", TESSERACT_CONFIG_CHAR)):
-            capture = self.GetCapture()
+            capture = self.__GetCapture()
             sleep(1)
         
         # Login as Guest
-        self.PerformClick(self.FindLocationOfString(capture, "Guest", TESSERACT_CONFIG_CHAR))
+        self.__PerformClick(self.FindLocationOfString(capture, "Guest", TESSERACT_CONFIG_CHAR))
 
         # Check if News is up
         while(not self.CanFindString(self.PreprocessForOCR(capture), "News", TESSERACT_CONFIG_CHAR)):
-            capture = self.GetCapture()
+            capture = self.__GetCapture()
             sleep(1)
 
         # Dismiss News
-        self.PerformClick((-500, 50))
+        self.__PerformClick((-500, 50))
     
-    def MenuToGame(self):
-        self.PerformClick((0 , 0))
-
-        capture = self.GetCapture()
-        px = (0, 0, 0)
+    def __MenuToGame(self):
+        self.__PerformClick((0 , 0))
 
         # Check if in the game
-        while(px != GOLD_PIXEL_COLOR):
-            capture = self.GetCapture()
-            px = capture.getpixel(GOLD_PIXEL)
+        while(not self.__IsInGame()):
             sleep(1)
 
-    def CloseHints(self):
+    def __IsInGame(self) -> bool:
+        capture = self.__GetCapture()
+        px = capture.getpixel(GOLD_PIXEL)
+        return px == GOLD_PIXEL_COLOR
+
+    def __CloseHints(self):
         # Close Hints found in the game
         while(True):
-            res = cv2.matchTemplate(self.close, np.array(self.GetCapture()), cv2.TM_CCOEFF_NORMED)
+            res = cv2.matchTemplate(self.__close, np.array(self.__GetCapture()), cv2.TM_CCOEFF_NORMED)
             loc = np.where(res >= 0.9)
 
             if(len(loc[0]) == 0 or len(loc[1]) == 0):
                 break
 
-            self.PerformClick(((loc[1][0] + 2) - (WIDTH//2), (loc[0][0] + 2) - (HEIGHT // 2)))
+            self.__PerformClick(((loc[1][0] + 2) - (WIDTH//2), (loc[0][0] + 2) - (HEIGHT // 2)))
             sleep(2)
 
     def GetGameState(self) -> GameState:
-        self.PerformClicks([(0,0)] * 5, 0.25)
-        self.CloseHints()
-        self.PerformClicks([(0,0)] * 3, 0.25)
+        self.__PerformClicks([(0,0)] * 5, 0.25)
+        self.__CloseHints()
+        self.__PerformClicks([(0,0)] * 3, 0.25)
 
         # Capture the game
-        capture = self.GetCapture()
+        capture = self.__GetCapture()
         
         # Crop the game characters for OCR
         gold = capture.crop(GOLD_CROP)
@@ -410,67 +440,69 @@ class SAP_API:
         lives = self.PreprocessForOCR(lives)
         rounds = self.PreprocessForOCR(rounds)
 
+        self.__state = GameState()
+
         # Setup Game State
-        self.state.fullGame = capture
+        self.__state.fullGame = capture
 
         # Use OCR
-        self.state.gold = self.ConvertToInt(gold, True)
-        self.state.lives = self.ConvertToInt(lives)
-        self.state.round = self.ConvertToInt(rounds)
+        self.__state.gold = self.ConvertToInt(gold, True)
+        self.__state.lives = self.ConvertToInt(lives)
+        self.__state.round = self.ConvertToInt(rounds)
 
         # Get the slots
-        self.state.animalSlots = self.GetSlots(capture, ANIMAL_SLOTS_START, ANIMAL_SLOTS_SIZE, 5)
-        self.state.shopSlots = self.GetSlots(capture, SHOP_SLOTS_START, SHOP_SLOTS_SIZE, self.state.GetNumberOfShopSlots())
-        self.state.foodSlots = self.GetSlots(capture, FOOD_SLOTS_START, SHOP_SLOTS_SIZE, self.state.GetNumberOfFoodSlots())
+        self.__state.animalSlots = self.GetSlots(capture, ANIMAL_SLOTS_START, ANIMAL_SLOTS_SIZE, 5)
+        self.__state.shopSlots = self.GetSlots(capture, SHOP_SLOTS_START, SHOP_SLOTS_SIZE, self.__state.GetNumberOfShopSlots())
+        self.__state.foodSlots = self.GetSlots(capture, FOOD_SLOTS_START, SHOP_SLOTS_SIZE, self.__state.GetNumberOfFoodSlots(), True)
 
-        return self.state
+        return self.__state
 
-    def PerformClick(self, coord : tuple[int, int]):
-        ActionChains(self.driver).move_to_element_with_offset(self.sap, coord[0], coord[1]).click().perform()
+    def __PerformClick(self, coord : tuple[int, int]):
+        ActionChains(self.__driver).move_to_element_with_offset(self.__sap, coord[0], coord[1]).click().perform()
 
-    def PerformClicks(self, coords : list[tuple[int, int]], delay = 0.1):
-        act = ActionChains(self.driver)
+    def __PerformClicks(self, coords : list[tuple[int, int]], delay = 0.1):
+        act = ActionChains(self.__driver)
         for coord in coords:
-            act.move_to_element_with_offset(self.sap, coord[0], coord[1]).click()
+            act.move_to_element_with_offset(self.__sap, coord[0], coord[1]).click()
             act.pause(delay)
         act.perform()
 
-    def Set(self, startSlot : int, endSlot : int):
-        self.PerformClicks([self.SLOT_LOCATIONS[startSlot], self.SLOT_LOCATIONS[endSlot]], 1)
+    def __Set(self, startSlot : int, endSlot : int):
+        self.__PerformClicks([self.__SLOT_LOCATIONS[startSlot], self.__SLOT_LOCATIONS[endSlot]], 1)
 
-    def Sell(self, slot : int):
-        self.PerformClicks([self.SLOT_LOCATIONS[slot], FREEZE_SELL_BUTTON], 1)
+    def __Sell(self, slot : int):
+        self.__PerformClicks([self.__SLOT_LOCATIONS[slot], FREEZE_SELL_BUTTON], 1)
 
-    def Freeze(self, slot : int):
-        self.PerformClicks([self.SLOT_LOCATIONS[slot], FREEZE_SELL_BUTTON], 1)
+    def __Freeze(self, slot : int):
+        self.__PerformClicks([self.__SLOT_LOCATIONS[slot], FREEZE_SELL_BUTTON], 1)
 
-    def Roll(self):
-        self.PerformClick(ROLL_BUTTON)
+    def __Roll(self):
+        self.__PerformClick(ROLL_BUTTON)
     
-    def EndRound(self):
-        self.PerformClick(END_ROUND_BUTTON)
+    def __EndRound(self):
+        self.__PerformClick(END_ROUND_BUTTON)
         
         skip = False
         # Check if Match Screen is up
-        while(not self.CanFindString(self.GetCapture().crop(PLAY_PAUSE_CROP), "P", TESSERACT_CONFIG_CHAR)):
+        while(not self.CanFindString(self.__GetCapture().crop(PLAY_PAUSE_CROP), "P", TESSERACT_CONFIG_CHAR)):
             # If you see results screen, skip initialization for this round.
-            if self.GetResult():
+            if self.__GetResult():
                 skip = True
                 break
 
         # Setup AutoPlay and Fast Forward
-        if(not self.isInitialized and not skip):
-            self.PerformClicks(ROUND_SETTINGS)
-            self.isInitialized = True
+        if(not self.__isInitialized and not skip):
+            self.__PerformClicks(ROUND_SETTINGS)
+            self.__isInitialized = True
 
         # Get Outcomes for the Round
-        while not self.GetResult():
+        while not self.__GetResult():
             sleep(1)
 
         self.BringBackToGame()
 
-    def GetResult(self) -> bool:
-        capture = self.GetCapture().crop(RESULTS_CROP)
+    def __GetResult(self) -> bool:
+        capture = self.__GetCapture().crop(RESULTS_CROP)
         capStr : str = pyt.image_to_string(capture, config = TESSERACT_CONFIG_CHAR)
         capStr = capStr.lower()
 
@@ -492,45 +524,49 @@ class SAP_API:
         else:
             return False
 
-
     def BringBackToGame(self):
-        capture = self.GetCapture()
+        capture = self.__GetCapture()
         while True:
             if(capture.getpixel(GOLD_PIXEL) == GOLD_PIXEL_COLOR):
                 return
             elif(self.CanFindString(capture, "Guest"), TESSERACT_CONFIG_CHAR):
-                self.PerformClick(LATER_BUTTON)
+                self.__PerformClick(LATER_BUTTON)
 
-            self.PerformClick((0, 0))
-            capture = self.GetCapture()
+            self.__PerformClick((0, 0))
+            capture = self.__GetCapture()
             sleep(1)
 
     def PerformAction(self, action: ActionTypes, startSlot: int, endSlot: int) -> bool:
-        for i in range(2):
+        for _ in range(2):
 
-            if(not self.state.IsActionValid(action, startSlot, endSlot)):
+            if(not self.__state.IsActionValid(action, startSlot, endSlot)):
                 return False
 
             if(action == ActionTypes.SET):
-                self.Set(startSlot, endSlot)
+                self.__Set(startSlot, endSlot)
             elif(action == ActionTypes.SELL):
-                self.Sell(startSlot)
+                self.__Sell(startSlot)
             elif(action == ActionTypes.FREEZE):
-                self.Freeze(startSlot)
+                self.__Freeze(startSlot)
             elif(action == ActionTypes.ROLL):
-                self.Roll()
+                self.__Roll()
             elif(action == ActionTypes.END):
-                self.EndRound()
-                return True
+                self.__EndRound()
 
 
             sleep(ACTION_DELAY)
             
             # Check if there is a difference in the game state
-            prevState = self.state
-            self.state = self.GetGameState()
+            self.__prevState = self.__state
+            self.GetGameState()
 
-            if(prevState == self.state):
+            if(self.__prevState == self.__state):
+                # ! This Dump is For Debugging
+                # * This Dump is For Debugging
+                directory = f"Errors/{action} {startSlot} {endSlot} - {time.time()}"
+                print(directory)
+                self.__prevState.DumpState(directory + "/Prev")
+                self.__state.DumpState(directory + "/Curr")
                 continue
 
             return True
@@ -587,12 +623,25 @@ class SAP_API:
             raise Exception("OCR returned nothing")
     
     @staticmethod
-    def GetSlots(img: Image, start : tuple[int, int], size: tuple[int, int], noOfSlots ) -> list[Image]:
+    def GetSlots(img: Image, start : tuple[int, int], size: tuple[int, int], noOfSlots, isFoodSlots = False ) -> list[Image]:
         slots = []
+
+        if isFoodSlots:
+            right, top = (start[0] + size[0] * 2, start[1])
+            bottom = top + size[1]
+
+            for _ in range(noOfSlots):
+                left = right - size[0]
+
+                slot = img.crop((left, top, right, bottom))
+                slots.append(slot)
+                right = left
+
+            return slots
 
         left, top = start
         bottom = top + size[1]
-        for i in range(noOfSlots):
+        for _ in range(noOfSlots):
             right = left + size[0]
 
             slot = img.crop((left, top, right, bottom))
@@ -602,19 +651,17 @@ class SAP_API:
         return slots
 
 if __name__ == '__main__':
-    options = Options()
-    options.add_argument("--mute-audio")
-    driver = webdriver.Chrome(service = Service(ChromeDriverManager().install()), options= options)
-    driver.maximize_window()
-
-    sap = SAP_API(driver, driver.current_window_handle)
+    sap = SAP_API()
 
     sap.InitializeGame()
 
     while True:
+
         state = sap.GetGameState()
         print(state)
+
         action = input("Enter Action (S - Set, L - Sell, F - Freeze, R - Roll, E - End, Q - Quit): ")
+    
         if(action == "S"):
             start = int(input("Enter Start Slot: "))
             end = int(input("Enter End Slot: "))

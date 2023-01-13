@@ -3,3 +3,5 @@ __pycache__
 config.toml
 bak.zip
 rand.py
+Errors
+logs.txt
