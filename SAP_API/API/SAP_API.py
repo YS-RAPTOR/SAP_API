@@ -6,7 +6,7 @@ import numpy as np
 import pytesseract as pyt
 import PIL.Image as PILImage
 
-from SAP_API import ASSET_FOLDER_LOCATION
+from SAP_API.Assets import ASSET_FOLDER_LOCATION
 from SAP_API.Common.Results import Results
 from SAP_API.Common.GameState import GameState
 from SAP_API.Common.ActionTypes import ActionTypes

@@ -5,7 +5,7 @@ from PIL.Image import Image
 import PIL.Image as PILImage
 from dataclasses import dataclass
 
-from SAP_API import ASSET_FOLDER_LOCATION
+from SAP_API.Assets import ASSET_FOLDER_LOCATION
 from SAP_API.Common.ActionTypes import ActionTypes
 
 @dataclass
