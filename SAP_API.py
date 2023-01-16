@@ -1,18 +1,17 @@
-import enum
 import cv2
 import io
 import cv2  
-import os
+import time
 import numpy as np
 import pytesseract as pyt
 import PIL.Image as PILImage
 
-import time
-from time import sleep
-from typing import Self
-from PIL.Image import Image
-from dataclasses import dataclass
+from Results import Results
+from ActionTypes import ActionTypes
+from GameState import GameState
 
+from time import sleep
+from PIL.Image import Image
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -82,218 +81,6 @@ ROUND_SETTINGS = [(0, -300), (100, -300)]
 TESSERACT_CONFIG_NUM = '--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789'
 TESSERACT_CONFIG_CHAR = '--psm 11 --oem 3 -c tessedit_char_whitelist=QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm '
 URL = "https://teamwood.itch.io/super-auto-pets"
-
-class ActionTypes(enum.Enum):
-    """Action types for the game"""
-    SET = 1
-    SELL = 2
-    FREEZE = 3
-    ROLL = 4
-    END = 5
-
-class Results(enum.Enum):
-    """Results of the game"""
-    LOSE = -1
-    DRAW = 0
-    WIN = 1
-
-@dataclass
-class GameState:
-    """Game state"""
-    # 5 animal slots, 5 shop slots, 2 food slots
-    # Total slots is 12 slots. Store as Array of images
-    __EMPTY_SLOTS = []
-
-    def __init__(self):
-        self.fullGame : Image = None
-
-        self.animalSlots : list[Image] = []
-        self.shopSlots : list[Image] = []
-        self.foodSlots : list[Image] = []
-        
-        for i in range(12):
-            self.__EMPTY_SLOTS.append(np.array(PILImage.open(f"Assets/EmptySlots/slot{i}.png")))
-
-        self.gold = 0
-        self.lives = 0
-        self.round = 0
-
-    def __eq__(self, __o: object) -> bool:
-
-        if(isinstance(__o, GameState) == False or __o == None):
-            return False
-
-        if(self.gold != __o.gold or self.lives != __o.lives or self.round != __o.round):
-            return False
-
-        # Check if the slots are the same
-        slots = self.GetSlots()
-        otherSlots = __o.GetSlots()
-
-        if(len(slots) != len(otherSlots)):
-            return False
-
-        for slot in range(len(slots)):
-
-            if(slots[slot] == None and otherSlots[slot] == None):
-                # If both is none then continue
-                continue
-            elif(slots[slot] == None or otherSlots[slot] == None):
-                # If one is none but the other is not then return false
-                return False
-
-            res = cv2.matchTemplate(np.array(slots[slot]), np.array(otherSlots[slot]), cv2.TM_CCOEFF_NORMED)
-            loc = np.where(res >= 0.99)
-
-            if(len(loc[0]) == 0 or len(loc[1]) == 0):
-                return False
-
-        return True
-
-    def __str__(self) -> str:
-        return f"Gold: {self.gold}\nLives: {self.lives}\nRound: {self.round}"
-
-    def copy(self) -> Self:
-        c = GameState()
-
-        c.fullGame = self.fullGame.copy()
-        c.animalSlots = self.animalSlots.copy()
-        c.shopSlots = self.shopSlots.copy()
-        c.foodSlots = self.foodSlots.copy()
-
-        c.gold = self.gold
-        c.lives = self.lives
-        c.round = self.round
-
-    def IsActionValid(self, action: ActionTypes, startSlot: int, endSlot: int) -> bool:
-        if(action == ActionTypes.SET):
-            # Check if the start slot is the same as the end slot
-            if(startSlot == endSlot):
-                return False
-
-            # Check if the start slot is a shop slot
-            if(startSlot >= 5):
-                # Check if the shop slot is available
-                if(not self.GetAllAvailableShopSlots()[startSlot - 5]):
-                    return False
-
-            # Check if the end slot is a shop slot
-            if(endSlot >= 5):
-                return False
-
-            # Check if Start Slot is Empty
-            if(self.IsSlotEmpty(startSlot)):
-                return False
-
-        elif(action == ActionTypes.SELL):
-            # Check if the slot is a shop slot
-            if(startSlot >= 5):
-                return False
-            
-            # Check if the slot is empty
-            if(self.IsSlotEmpty(startSlot)):
-                return False
-
-        elif(action == ActionTypes.FREEZE):
-            # Check if the slot is an animal slot
-            if(startSlot < 5):
-                return False
-
-            # Check if the Shop Slot is available
-            if(not self.GetAllAvailableShopSlots()[startSlot - 5]):
-                return False
-
-            # Check if the slot is empty
-            if(self.IsSlotEmpty(startSlot)):
-                return False
-                
-        elif(action == ActionTypes.ROLL):
-            # No Gold to reroll
-            if(self.gold == 0):
-                return False
-
-        return True
-    
-    def GetNumberOfShopSlots(self) -> int:
-        noOfSlots = 0
-
-        if(self.round >= 1):
-            noOfSlots += 3
-        
-        if(self.round >= 5):
-            noOfSlots += 1
-
-        if(self.round >= 9):
-            noOfSlots += 1
-
-        return noOfSlots
-
-    def GetNumberOfFoodSlots(self) -> int:
-        noOfSlots = 0
-
-        if(self.round >= 1):
-            noOfSlots += 1
-
-        if(self.round >= 3):
-            noOfSlots += 1
-
-        return noOfSlots
-
-    def GetAllAvailableShopSlots(self) -> list[bool]:
-        availableSlots = [False] * 7
-        noOfSlots = self.GetNumberOfShopSlots()
-
-        for i in range(noOfSlots):
-            availableSlots[i] = True
-
-        noOfSlots = self.GetNumberOfFoodSlots()
-
-        for i in range(6, 6 - noOfSlots, -1):
-            availableSlots[i] = True
-
-        return availableSlots
-
-    def GetSlots(self) -> list[Image]:
-        slots = []
-        slots.extend(self.animalSlots)
-        slots.extend(self.shopSlots)
-        slots.extend([None] * ((5 - self.GetNumberOfShopSlots()) + (2 - self.GetNumberOfFoodSlots())))    
-        slots.extend(self.foodSlots)
-
-        return slots
-
-    def IsSlotEmpty(self, slot: int) -> bool:
-        res = cv2.matchTemplate(self.__EMPTY_SLOTS[slot], np.array(self.GetSlots()[slot]), cv2.TM_CCOEFF_NORMED)
-        loc = np.where(res >= 0.85)
-
-        if(len(loc[0]) == 0 or len(loc[1]) == 0):
-            return False
-
-        return True
-    
-    def DumpState(self, directory = ""):   
-        
-        if(directory != ""):
-            directory += "/"
-
-        if(not os.path.exists(directory) and not directory == ""):
-            os.makedirs(directory)
-
-        # txt File with information
-        with open(f"{directory}state.txt", "w") as f:
-            f.write(str(self))
-
-        # Images of the slots
-        self.fullGame.save(f"{directory}fullGame.png")
-
-        for i, animal in enumerate(self.animalSlots):
-            animal.save(f"{directory}animal{i}.png")
-
-        for i, shop in enumerate(self.shopSlots):
-            shop.save(f"{directory}shop{i}.png")
-
-        for i, food in enumerate(self.foodSlots):
-            food.save(f"{directory}food{i}.png")
     
 class SAP_API:
     __SLOT_LOCATIONS : list[tuple[int, int]] = []
@@ -452,8 +239,8 @@ class SAP_API:
 
         # Get the slots
         self.__state.animalSlots = self.GetSlots(capture, ANIMAL_SLOTS_START, ANIMAL_SLOTS_SIZE, 5)
-        self.__state.shopSlots = self.GetSlots(capture, SHOP_SLOTS_START, SHOP_SLOTS_SIZE, self.__state.GetNumberOfShopSlots())
-        self.__state.foodSlots = self.GetSlots(capture, FOOD_SLOTS_START, SHOP_SLOTS_SIZE, self.__state.GetNumberOfFoodSlots(), True)
+        self.__state.shopSlots = self.GetSlots(capture, SHOP_SLOTS_START, SHOP_SLOTS_SIZE, 5)
+        self.__state.foodSlots = self.GetSlots(capture, FOOD_SLOTS_START, SHOP_SLOTS_SIZE, 2)
 
         return self.__state
 
@@ -623,21 +410,8 @@ class SAP_API:
             raise Exception("OCR returned nothing")
     
     @staticmethod
-    def GetSlots(img: Image, start : tuple[int, int], size: tuple[int, int], noOfSlots, isFoodSlots = False ) -> list[Image]:
+    def GetSlots(img: Image, start : tuple[int, int], size: tuple[int, int], noOfSlots) -> list[Image]:
         slots = []
-
-        if isFoodSlots:
-            right, top = (start[0] + size[0] * 2, start[1])
-            bottom = top + size[1]
-
-            for _ in range(noOfSlots):
-                left = right - size[0]
-
-                slot = img.crop((left, top, right, bottom))
-                slots.append(slot)
-                right = left
-
-            return slots
 
         left, top = start
         bottom = top + size[1]
@@ -649,36 +423,3 @@ class SAP_API:
             left = right
 
         return slots
-
-if __name__ == '__main__':
-    sap = SAP_API()
-
-    sap.InitializeGame()
-
-    while True:
-
-        state = sap.GetGameState()
-        print(state)
-
-        action = input("Enter Action (S - Set, L - Sell, F - Freeze, R - Roll, E - End, Q - Quit): ")
-    
-        if(action == "S"):
-            start = int(input("Enter Start Slot: "))
-            end = int(input("Enter End Slot: "))
-            status = sap.PerformAction(ActionTypes.SET, start, end)
-        elif(action == "L"):
-            slot = int(input("Enter Slot: "))
-            status = sap.PerformAction(ActionTypes.SELL, slot, 0)
-        elif(action == "F"):
-            slot = int(input("Enter Slot: "))
-            status = sap.PerformAction(ActionTypes.FREEZE, slot, 0)
-        elif(action == "R"):
-            status = sap.PerformAction(ActionTypes.ROLL, 0, 0)
-        elif(action == "E"):
-            status = sap.PerformAction(ActionTypes.END, 0, 0)
-        elif(action == "Q"):
-            sap.__del__()
-            break
-
-        if(not status):
-            print("Invalid Action")
