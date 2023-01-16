@@ -6,9 +6,9 @@ import numpy as np
 import pytesseract as pyt
 import PIL.Image as PILImage
 
-from Results import Results
-from ActionTypes import ActionTypes
-from GameState import GameState
+from Common.Results import Results
+from Common.ActionTypes import ActionTypes
+from Common.GameState import GameState
 
 from time import sleep
 from PIL.Image import Image

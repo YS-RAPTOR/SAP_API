@@ -1,7 +1,7 @@
 import time
 import numpy as np
-from SAP_API import SAP_API
-from ActionTypes import ActionTypes
+from API.SAP_API import SAP_API
+from Common.ActionTypes import ActionTypes
 
 class Randy:
     def __init__(self):
@@ -12,7 +12,6 @@ class Randy:
     def GetRandomAction(self) -> ActionTypes:
         i = np.random.choice([1,2,3,4,5], p=[0.3, 0.3, 0.3, 0.05, 0.05])
         return ActionTypes(i)
-
 
     def run(self):
         while True:

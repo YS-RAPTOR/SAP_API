@@ -5,7 +5,7 @@ from PIL.Image import Image
 import PIL.Image as PILImage
 from dataclasses import dataclass
 
-from ActionTypes import ActionTypes
+from Common.ActionTypes import ActionTypes
 
 @dataclass
 class GameState:
