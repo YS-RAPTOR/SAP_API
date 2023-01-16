@@ -5,7 +5,8 @@ from PIL.Image import Image
 import PIL.Image as PILImage
 from dataclasses import dataclass
 
-from Common.ActionTypes import ActionTypes
+from SAP_API import ASSET_FOLDER_LOCATION
+from SAP_API.Common.ActionTypes import ActionTypes
 
 @dataclass
 class GameState:
@@ -23,10 +24,10 @@ class GameState:
         self.foodSlots : list[Image] = []
         
         for i in range(12):
-            self.__EMPTY_SLOTS.append(np.array(PILImage.open(f"Assets/EmptySlots/slot{i}.png")))
+            self.__EMPTY_SLOTS.append(np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/EmptySlots/slot{i}.png")))
 
         for i in range(3):
-            self.__NOT_AVAILABLE.append(np.array(PILImage.open(f"Assets/NotAvailableSlots/NA{i}.png")))
+            self.__NOT_AVAILABLE.append(np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/NotAvailableSlots/NA{i}.png")))
             pass
 
         self.gold = 0

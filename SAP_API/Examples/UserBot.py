@@ -1,6 +1,6 @@
-from API.SAP_API import SAP_API
-from Common.GameState import GameState
-from Common.ActionTypes import ActionTypes
+from SAP_API.API.SAP_API import SAP_API
+from SAP_API.Common.GameState import GameState
+from SAP_API.Common.ActionTypes import ActionTypes
 
 class UserBot:
     def __init__(self):

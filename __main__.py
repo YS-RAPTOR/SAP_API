@@ -1,5 +1,3 @@
-from Examples.UserBot import UserBot
+from SAP_API.API.SAP_API import SAP_API
 
-if __name__ == "__main__":
-    bot = UserBot()
-    bot.run()
+api = SAP_API()

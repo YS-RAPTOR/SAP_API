@@ -6,9 +6,10 @@ import numpy as np
 import pytesseract as pyt
 import PIL.Image as PILImage
 
-from Common.Results import Results
-from Common.ActionTypes import ActionTypes
-from Common.GameState import GameState
+from SAP_API import ASSET_FOLDER_LOCATION
+from SAP_API.Common.Results import Results
+from SAP_API.Common.GameState import GameState
+from SAP_API.Common.ActionTypes import ActionTypes
 
 from time import sleep
 from PIL.Image import Image
@@ -89,7 +90,7 @@ class SAP_API:
     def __init__(self):
         # Setup Static Variables
         if(self.__close == None):
-            self.__close = np.array(PILImage.open("Assets/close.png"))
+            self.__close = np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/close.png"))
 
         if(len(self.__SLOT_LOCATIONS) == 0):
             self.__CreateSlotLocs()

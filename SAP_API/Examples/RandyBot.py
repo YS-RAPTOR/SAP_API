@@ -1,7 +1,7 @@
 import time
 import numpy as np
-from API.SAP_API import SAP_API
-from Common.ActionTypes import ActionTypes
+from SAP_API.API.SAP_API import SAP_API
+from SAP_API.Common.ActionTypes import ActionTypes
 
 class Randy:
     def __init__(self):
