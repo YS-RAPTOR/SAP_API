@@ -1,6 +1,7 @@
-from SAP_API.Examples.UserBot import UserBot
-from SAP_API.Common.GameState import GameState
+from SAP_API.API.Server.Server import Server
+
+#TODO Arg Parser for host, port and whitelist
 
 if __name__ == "__main__":
-    bot = UserBot()
-    bot.run()
+    
+    s = Server()

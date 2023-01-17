@@ -6,9 +6,9 @@ import numpy as np
 import pytesseract as pyt
 import PIL.Image as PILImage
 
-from SAP_API.Assets import ASSET_FOLDER_LOCATION
 from SAP_API.Common.Results import Results
 from SAP_API.Common.GameState import GameState
+from SAP_API.Assets import ASSET_FOLDER_LOCATION
 from SAP_API.Common.ActionTypes import ActionTypes
 
 from time import sleep
@@ -87,7 +87,9 @@ class SAP_API:
     __SLOT_LOCATIONS : list[tuple[int, int]] = []
     __close : np.ndarray = None
 
-    def __init__(self):
+    def __init__(self, DEBUG = False):
+        self.__debug = DEBUG
+
         # Setup Static Variables
         if(self.__close == None):
             self.__close = np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/close.png"))
@@ -349,12 +351,13 @@ class SAP_API:
             self.GetGameState()
 
             if(self.__prevState == self.__state):
-                # ! This Dump is For Debugging
-                # * This Dump is For Debugging
-                directory = f"Errors/{action} {startSlot} {endSlot} - {time.time()}"
-                print(directory)
-                self.__prevState.DumpState(directory + "/Prev")
-                self.__state.DumpState(directory + "/Curr")
+                if(self.__debug):
+                    # ! This Dump is For Debugging
+                    # * This Dump is For Debugging
+                    directory = f"Errors/{action} {startSlot} {endSlot} - {time.time()}"
+                    print(directory)
+                    self.__prevState.DumpState(directory + "/Prev")
+                    self.__state.DumpState(directory + "/Curr")
                 continue
 
             return True

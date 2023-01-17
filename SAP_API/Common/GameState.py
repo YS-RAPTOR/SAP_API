@@ -171,3 +171,9 @@ class GameState:
 
         for i, food in enumerate(self.foodSlots):
             food.save(f"{directory}food{i}.png")
+
+    def __init__(self, bytes : bytearray):
+        pass
+
+    def Serialize() -> bytearray:
+        pass
