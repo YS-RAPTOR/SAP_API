@@ -13,8 +13,7 @@ class MessageTypes(enum.Enum):
     PERFORM_ACTION_RESPONSE = "ACTION_R"
     RESULTS = "RESULTS"
 
-    RESET = "RESET"
-    RESET_RESPONSE = "RESET_R"
+    DEBUG = "DEBUG"
 
     ERROR_RESPONSE = "ERROR"
 
@@ -23,3 +22,4 @@ class ServerErrors(enum.Enum):
     MAX_CLIENTS_REACHED = 1
     TIMEOUT = 2
     INVALID_MESSAGE = 3
+    DEBUG_DISABLED = 4
