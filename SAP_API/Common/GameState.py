@@ -1,6 +1,7 @@
 import os
 import cv2
 import numpy as np
+from io import BytesIO
 from PIL.Image import Image
 import PIL.Image as PILImage
 from dataclasses import dataclass
@@ -17,22 +18,54 @@ class GameState:
     __NOT_AVAILABLE = []
 
     def __init__(self):
+        # Initialize the empty slots and not available slots
+        if(len(GameState.__EMPTY_SLOTS) == 0):
+            for i in range(12):
+                    self.__EMPTY_SLOTS.append(np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/EmptySlots/slot{i}.png")))
+
+        if(len(GameState.__NOT_AVAILABLE) == 0):
+            for i in range(3):
+                self.__NOT_AVAILABLE.append(np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/NotAvailableSlots/NA{i}.png")))
+
         self.fullGame : Image = None
 
         self.animalSlots : list[Image] = []
         self.shopSlots : list[Image] = []
         self.foodSlots : list[Image] = []
-        
-        for i in range(12):
-            self.__EMPTY_SLOTS.append(np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/EmptySlots/slot{i}.png")))
-
-        for i in range(3):
-            self.__NOT_AVAILABLE.append(np.array(PILImage.open(f"{ASSET_FOLDER_LOCATION}/NotAvailableSlots/NA{i}.png")))
-            pass
 
         self.gold = 0
         self.lives = 0
         self.round = 0
+
+    def Serialize(self) -> list[bytearray]:
+        """Serialize the game state into a list of bytearrays"""
+        state = f"{self.gold},{self.lives},{self.round}".encode("utf-8")
+        stateSerialized = [state]
+
+        # Serialize the full game
+        fullGameBytes = BytesIO()
+        self.fullGame.save(fullGameBytes, format="PNG")
+        stateSerialized.append(fullGameBytes.getvalue())
+
+        # Serialize the animal slots
+        for slot in self.animalSlots:
+            slotBytes = BytesIO()
+            slot.save(slotBytes, format="PNG")
+            stateSerialized.append(slotBytes.getvalue())
+
+        # Serialize the shop slots
+        for slot in self.shopSlots:
+            slotBytes = BytesIO()
+            slot.save(slotBytes, format="PNG")
+            stateSerialized.append(slotBytes.getvalue())
+
+        # Serialize the food slots
+        for slot in self.foodSlots:
+            slotBytes = BytesIO()
+            slot.save(slotBytes, format="PNG")
+            stateSerialized.append(slotBytes.getvalue())
+
+        return stateSerialized
 
     def __eq__(self, __o: object) -> bool:
 
@@ -171,9 +204,3 @@ class GameState:
 
         for i, food in enumerate(self.foodSlots):
             food.save(f"{directory}food{i}.png")
-
-    def __init__(self, bytes : bytearray):
-        pass
-
-    def Serialize() -> bytearray:
-        pass
