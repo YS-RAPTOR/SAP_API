@@ -28,7 +28,13 @@ In the Examples Folder you can find **UserBot** and **RandyBot** that uses this 
 
 ---
 
-If you want to run the API using a **Server/Client architecture** you can startup a server by running **RunServer.py** or creating an instance of **Server** from **SAP_API.API.Server** as shown below:
+If you want to run the API using a **Server/Client architecture** there are two ways you can start a server:
+* Run the module
+~~~bash
+python -m SAP_API
+~~~
+
+* Creating an instance of **Server** from **SAP_API.API.Server** as shown below:
 
 ~~~python
 from SAP_API.API.Server.Server import Server
