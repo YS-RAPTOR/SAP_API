@@ -24,4 +24,4 @@ if __name__ == "__main__":
     print("Timeout: {} minutes".format(args.timeout))
     print("Debug Mode: {}".format(args.debug))
     
-    s = Server(host="127.0.0.1", port=5000, whitelist=["127.0.0.1"], max_clients=10, timeout=5, debug=False)
+    s = Server(host="127.0.0.1", port=5000, whitelist=["127.0.0.1"], maxClients=10, timeoutTime=5, debug=False)
