@@ -3,6 +3,13 @@
 ## **Requirements :**
 * [You need to have tesseract installed.](https://tesseract-ocr.github.io/tessdoc/Installation.html "Learn how to install tesseract here")
 ---
+## **How to Install**
+~~~bash
+git clone https://github.com/YS-RAPTOR/SAP_API.git
+pip install SAP_API/
+~~~
+
+---
 ## **General Information**
 
 There are two main ways to run this API:
