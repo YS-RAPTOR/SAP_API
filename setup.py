@@ -16,7 +16,7 @@ setup(
     author='YS-RAPTOR',
     url='https://github.com/YS-RAPTOR/SAP_API',
     license='GPLv3',
-    requires=get_install_requires(),
+    install_requires=get_install_requires(),
     packages=find_namespace_packages(exclude=['SAP_API.Assets.*']),
     package_data={'SAP_API.Assets': ['*.png', 'EmptySlots/*.png', 'NotAvailableSlots/*.png']}
 )
