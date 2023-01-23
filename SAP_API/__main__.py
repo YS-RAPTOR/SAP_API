@@ -2,8 +2,7 @@ import sys
 import argparse
 from SAP_API.API.Server.Server import Server
 
-if __name__ == "__main__":
-
+def main():
     parser = argparse.ArgumentParser(description='Starts the SAP API Server')
 
     parser.add_argument("--host", "-s", type=str, default="127.0.0.1", help="Host to listen on")
@@ -25,3 +24,6 @@ if __name__ == "__main__":
     print("Debug Mode: {}".format(args.debug))
     
     s = Server(host="127.0.0.1", port=5000, whitelist=["127.0.0.1"], maxClients=10, timeoutTime=5, debug=False)
+
+if __name__ == "__main__":
+    main()
