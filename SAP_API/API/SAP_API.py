@@ -1,6 +1,5 @@
 import cv2
 import io
-import cv2  
 import time
 import numpy as np
 import pytesseract as pyt
@@ -28,8 +27,8 @@ class SAP_API:
     __SLOT_LOCATIONS : list[tuple[int, int]] = []
     __close : np.ndarray = None
 
-    def __init__(self, DEBUG = False):
-        self.__debug = DEBUG
+    def __init__(self, debug = False):
+        self.__debug = debug
 
         # Setup Static Variables
         if(self.__close == None):

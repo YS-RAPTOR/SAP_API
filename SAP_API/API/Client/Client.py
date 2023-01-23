@@ -13,6 +13,7 @@ class Client:
     def __init__(self, ip : str, port : int):
         self.ip = ip
         self.port = port
+        self.result : Results = None
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((ip, port))
@@ -124,8 +125,8 @@ class Client:
 
         return gameState        
 
-    def PerformAction(self, actionType : ActionTypes, start : int , end : int ) -> tuple[bool, Results]:
-        self.sock.send(CreateMessage(MessageTypes.PERFORM_ACTION, SerializeAction(actionType, start, end)))
+    def PerformAction(self, action : ActionTypes, startSlot : int , endSlot : int ) -> tuple[bool, Results]:
+        self.sock.send(CreateMessage(MessageTypes.PERFORM_ACTION, SerializeAction(action, startSlot, endSlot)))
 
         msg = GetMessage(self.sock)
 
@@ -140,7 +141,12 @@ class Client:
         if(msgType != MessageTypes.PERFORM_ACTION_RESPONSE):
             return None
 
-        return DeserializeActionResponse(msg)
+        status, result = DeserializeActionResponse(msg)
+
+        if(result != None):
+            self.result = result
+
+        return (status, result)
 
     def Debug(self):
         self.sock.send(CreateMessage(MessageTypes.DEBUG, b'1'))

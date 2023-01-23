@@ -23,9 +23,11 @@ class Main2ProcessSharedVals:
         self.driverPID = Value("i", -1)
 
 class Server:
-    def __init__(self, host : str, port : int, whitelist : list[str], debug : bool = False):
+    def __init__(self, host : str, port : int, whitelist : list[str], maxClients : int, timeoutTime : int, debug : bool = False,  ):
         self.whitelist = whitelist
         self.debug = debug
+        self.maxClients = maxClients
+        self.timeoutTime = timeoutTime * 60
         
         self.sockets : list[socket.socket] = [socket.socket(socket.AF_INET, socket.SOCK_STREAM)]
         self.sockets[0].bind((host, port))
@@ -33,9 +35,9 @@ class Server:
         self.clientsProcesses : dict[int, tuple[Process, APIProcess]] = {}
         self.shared : dict[int, Main2ProcessSharedVals] = {}
         # 16 is the max responses a single request can have
-        self.responses = Queue(MAX_CLIENTS * 16)
+        self.responses = Queue(self.maxClients * 16)
 
-        self.sockets[0].listen(MAX_CLIENTS)
+        self.sockets[0].listen(self.maxClients)
         self.Run()
 
     def __del__(self):
@@ -80,8 +82,8 @@ class Server:
 
                     client, addr = sock.accept()
 
-                    if(len(self.clientsProcesses) >= MAX_CLIENTS):
-                        client.send(CreateMessage(MessageTypes.ERROR_RESPONSE, SerializeError(ServerErrors.MAX_CLIENTS_REACHED)))
+                    if(len(self.clientsProcesses) >= self.maxClients):
+                        client.send(CreateMessage(MessageTypes.ERROR_RESPONSE, SerializeError(ServerErrors.self.maxClients_REACHED)))
                         client.close()
                         continue
 
@@ -93,7 +95,7 @@ class Server:
                     self.sockets.append(client)
                     apiP = APIProcess()
                     self.shared[client.fileno()] = Main2ProcessSharedVals()
-                    self.clientsProcesses[client.fileno()] = (Process(target = apiP.Initialize, args = (client.fileno(), self.shared[client.fileno()], self.responses, )), apiP)
+                    self.clientsProcesses[client.fileno()] = (Process(target = apiP.Initialize, args = (client.fileno(), self.shared[client.fileno()], self.responses, self.debug,)), apiP)
                     self.clientsProcesses[client.fileno()][0].start()
                 else:
                     msg = GetMessage(sock)
@@ -115,9 +117,9 @@ class Server:
                         self.shared[sock.fileno()].RequestType.value = msgType.value
                         self.shared[sock.fileno()].RequestData.value = msg
                         if(msgType == MessageTypes.INITIALIZE_GAME):
-                            self.shared[sock.fileno()].TimeoutTime.value = time.time() + (TIMEOUT_TIME * 2)
+                            self.shared[sock.fileno()].TimeoutTime.value = time.time() + (self.timeoutTime * 2)
                         else:
-                            self.shared[sock.fileno()].TimeoutTime.value = time.time() + TIMEOUT_TIME
+                            self.shared[sock.fileno()].TimeoutTime.value = time.time() + self.timeoutTime
 
             for sock in error:
                 self.Close(sock)
@@ -158,11 +160,28 @@ class Server:
         return None
 
     def Debug(self):
+        print("Number of Clients: ", len(self.clientsProcesses))
+
+        print()
+        print("Socket Data:")
+        
+        for sock in self.sockets[1:]:
+            print("Socket Name: ", sock.getsockname())
+            print("Socket ID: ", sock.fileno())
+            print("Client IP: ", sock.getpeername()[0])
+            print("Client Port: ", sock.getpeername()[1])
+
+        print()
+        print("Shared Data:")
+
         for id, share in self.shared.items():
             print("Client ID: ", id)
             print("Request Type: ", share.RequestType.value)
             print("Request Data: ", share.RequestData.value)
             print("Timeout Time: ", share.TimeoutTime.value)
+        
+        print()
+        print("Process Data:")
 
         for id, p in self.clientsProcesses.items():
             print("Client ID: ", id)
@@ -183,12 +202,12 @@ class APIProcess:
         if(hasattr(self, "shared")):
             del self.shared
 
-    def Initialize(self, id : int, shared : Main2ProcessSharedVals, responses : Queue):
+    def Initialize(self, id : int, shared : Main2ProcessSharedVals, responses : Queue, debug : bool):
         self.id = id
         self.shared = shared
         self.responses = responses
 
-        self.api = SAP_API()
+        self.api = SAP_API(debug)
         self.shared.driverPID.value = self.api.driverPID
         responses.put((CreateMessage(MessageTypes.INIT, b"1"), self.id))
 
@@ -218,9 +237,9 @@ class APIProcess:
                 self.responses.put((CreateMessage(MessageTypes(i + 4), serializedState[i]), self.id))
 
         elif(msgType == MessageTypes.PERFORM_ACTION):
-            actionType, start, end = DeserializeAction(msg)
-            status = self.api.PerformAction(actionType, start, end)
-            self.responses.put((CreateMessage(MessageTypes.PERFORM_ACTION_RESPONSE, SerializeActionResponse(status, actionType, self.api.result)), self.id))
+            action, startSlot, endSlot = DeserializeAction(msg)
+            status = self.api.PerformAction(action, startSlot, endSlot)
+            self.responses.put((CreateMessage(MessageTypes.PERFORM_ACTION_RESPONSE, SerializeActionResponse(status, action, self.api.result)), self.id))
         else:
             self.responses.put((CreateMessage(MessageTypes.ERROR_RESPONSE, SerializeError(ServerErrors.INVALID_MESSAGE)), self.id))
 
