@@ -1,6 +1,6 @@
 import sys
 import argparse
-from SAP_API.API import Server
+from SAP_API.API.Server import Server
 
 def main():
     parser = argparse.ArgumentParser(description='Starts the SAP API Server')
