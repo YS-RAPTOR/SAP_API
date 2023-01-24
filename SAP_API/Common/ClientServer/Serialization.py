@@ -19,7 +19,7 @@ def SerializeError(error : ServerErrors) -> bytearray:
 def DeserializeAction(msg : bytearray) -> tuple[ActionTypes, int, int]:
     msg = msg.decode("utf-8")
     type, start, end = msg.split(",")
-    return (ActionTypes(type), int(start), int(end))
+    return (ActionTypes(int(type)), int(start), int(end))
 
 def DeserializeActionResponse(msg : bytearray) -> tuple[bool, Results]:
     msg = msg.decode("utf-8")
@@ -30,7 +30,7 @@ def DeserializeActionResponse(msg : bytearray) -> tuple[bool, Results]:
 
     # Has Status and Result
     status, result = msg.split(",")
-    return (bool(int(status)), Results(result))
+    return (bool(int(status)), Results(int(result)))
 
 def DeserializeError(msg : bytearray) -> ServerErrors:
     return ServerErrors(int(msg.decode("utf-8")))

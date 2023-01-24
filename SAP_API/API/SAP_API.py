@@ -29,6 +29,7 @@ class SAP_API:
 
     def __init__(self, debug = False):
         self.__debug = debug
+        self.result = None
 
         # Setup Static Variables
         if(self.__close == None):
