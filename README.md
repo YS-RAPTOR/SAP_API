@@ -5,8 +5,7 @@
 ---
 ## **How to Install**
 ~~~bash
-git clone https://github.com/YS-RAPTOR/SAP_API.git
-pip install SAP_API/
+python -m pip install git+https://github.com/YS-RAPTOR/SAP_API.git#egg=SAP_API
 ~~~
 
 ---
