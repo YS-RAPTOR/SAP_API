@@ -37,7 +37,7 @@ python -m SAP_API
 * Creating an instance of **Server** from **SAP_API.API.Server** as shown below:
 
 ~~~python
-from SAP_API.API.Server.Server import Server
+from SAP_API.API.Server import Server
 
 S = Server(host="127.0.0.1", port=5000, whitelist=["127.0.0.1"], maxClients=10, timeoutTime=5, debug=False)
 ~~~
@@ -56,7 +56,7 @@ The Server can have multiple options:
 
 You should then create an instance of **Client** from **SAP_API.API.Client** as shown below:
 ~~~python
-from SAP_API.API.Client.Client import Client
+from SAP_API.API.Client import Client
 
 C = Client("127.0.0.1", 5000)
 ~~~
