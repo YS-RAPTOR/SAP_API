@@ -1,0 +1,10 @@
+Each API has access to its own webdriver
+
+__init__ promises only Website and starts a task to Initialize game. 
+    Pass settings to the API
+    No Changing settings after Initialization   
+    Allow User Login. Assumes login is correct. If Incorrect Raises Error. If no Login Anonymous
+    API Options : How many tries ..etc
+
+Task: Initialize Game - Clicks play, Logs in, 
+
