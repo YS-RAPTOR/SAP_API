@@ -1,6 +1,6 @@
 from enum import Enum, auto
 
-class API_State(Enum):
+class StateTypes(Enum):
     NOT_INITIALIZED = auto()
     PRIVACY_POLICY = auto()
     LOGIN = auto()
