@@ -111,8 +111,7 @@ class SAP_API:
             sleep(10)
         
         # Accept EULA
-        loc = self.FindLocationOfString(capture, "Accept")
-        self.__PerformClick(loc)
+        self.PerformClick((900 - 720, 600 - 360))
 
         # Check if Login screen is up
         while(not self.CanFindString(capture, "Guest", TESSERACT_CONFIG_CHAR)):
@@ -120,7 +119,7 @@ class SAP_API:
             sleep(1)
         
         # Login as Guest
-        self.__PerformClick(self.FindLocationOfString(capture, "Guest", TESSERACT_CONFIG_CHAR))
+        self.PerformClick(self.FindLocationOfString(capture, "cuest", TESSERACT_CONFIG_CHAR))
 
         # Check if News is up
         while(not self.CanFindString(self.PreprocessForOCR(capture.crop(NEWS_CROP)), "News", TESSERACT_CONFIG_CHAR)):
@@ -128,10 +127,10 @@ class SAP_API:
             sleep(1)
 
         # Dismiss News
-        self.__PerformClick((-500, 50))
+        self.PerformClick((600, 300))
     
     def __MenuToGame(self):
-        self.__PerformClick((0 , 0))
+        self.PerformClick((0 , 0))
 
         # Check if in the game
         while(not self.__IsInGame()):
@@ -151,7 +150,7 @@ class SAP_API:
             if(len(loc[0]) == 0 or len(loc[1]) == 0):
                 break
 
-            self.__PerformClick(((loc[1][0] + 2) - (WIDTH//2), (loc[0][0] + 2) - (HEIGHT // 2)))
+            self.PerformClick(((loc[1][0] + 2) - (WIDTH//2), (loc[0][0] + 2) - (HEIGHT // 2)))
             sleep(2)
 
     def GetGameState(self) -> GameState:
@@ -190,7 +189,7 @@ class SAP_API:
 
         return self.__state
 
-    def __PerformClick(self, coord : tuple[int, int]):
+    def PerformClick(self, coord : tuple[int, int]):
         ActionChains(self.__driver).move_to_element_with_offset(self.__sap, coord[0], coord[1]).click().perform()
 
     def __PerformClicks(self, coords : list[tuple[int, int]], delay = 0.1):
@@ -210,10 +209,10 @@ class SAP_API:
         self.__PerformClicks([self.__SLOT_LOCATIONS[slot], FREEZE_SELL_BUTTON], 1)
 
     def __Roll(self):
-        self.__PerformClick(ROLL_BUTTON)
+        self.PerformClick(ROLL_BUTTON)
     
     def __EndRound(self):
-        self.__PerformClick(END_ROUND_BUTTON)
+        self.PerformClick(END_ROUND_BUTTON)
         
         skip = False
         # Check if Match Screen is up
@@ -263,9 +262,9 @@ class SAP_API:
             if(capture.getpixel(GOLD_PIXEL) == GOLD_PIXEL_COLOR):
                 return
             elif(self.CanFindString(capture, "Guest"), TESSERACT_CONFIG_CHAR):
-                self.__PerformClick(LATER_BUTTON)
+                self.PerformClick(LATER_BUTTON)
 
-            self.__PerformClick((0, 0))
+            self.PerformClick((0, 0))
             capture = self.__GetCapture()
             sleep(1)
 
