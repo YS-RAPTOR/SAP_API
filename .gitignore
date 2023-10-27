@@ -7,3 +7,4 @@ Errors
 logs.txt
 *.egg-info
 build
+.hypothesis

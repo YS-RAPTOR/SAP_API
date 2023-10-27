@@ -10,7 +10,6 @@ from SAP_API.Common.GameState import GameState
 from SAP_API.Assets import ASSET_FOLDER_LOCATION
 from SAP_API.Common.ActionTypes import ActionTypes
 from SAP_API.API.Constants import *
-
 from time import sleep
 from PIL.Image import Image
 from selenium import webdriver
@@ -89,7 +88,7 @@ class SAP_API:
         # Get the game to the menu
         self.__GetToMenu()
         # Initialize Settings
-        self.__PerformClicks(SETTINGS)
+        self.__PerformClicks(SETTINGS, 0.5)
 
         self.__MenuToGame()
 
@@ -105,21 +104,21 @@ class SAP_API:
         capture = self.__GetCapture()
 
         # Check if EULA is UP
-        while(not self.CanFindString(capture, "consent")):
+        while(not self.CanFindString(capture, "accept")):
             self.__sap.click()
             capture = self.__GetCapture()
             sleep(10)
         
         # Accept EULA
-        self.PerformClick((900 - 720, 600 - 360))
+        self.PerformClick((0, 150))
 
         # Check if Login screen is up
-        while(not self.CanFindString(capture, "Guest", TESSERACT_CONFIG_CHAR)):
+        while(not self.CanFindString(capture, "Password", TESSERACT_CONFIG_CHAR)):
             capture = self.__GetCapture()
             sleep(1)
         
         # Login as Guest
-        self.PerformClick(self.FindLocationOfString(capture, "cuest", TESSERACT_CONFIG_CHAR))
+        self.PerformClick((160, 240))
 
         # Check if News is up
         while(not self.CanFindString(self.PreprocessForOCR(capture.crop(NEWS_CROP)), "News", TESSERACT_CONFIG_CHAR)):
@@ -127,10 +126,10 @@ class SAP_API:
             sleep(1)
 
         # Dismiss News
-        self.PerformClick((600, 300))
+        self.PerformClick((410, 320))
     
     def __MenuToGame(self):
-        self.PerformClick((0 , 0))
+        self.__PerformClicks([(0 , -100), (0 , -100), (460 , 330)])
 
         # Check if in the game
         while(not self.__IsInGame()):
@@ -341,8 +340,8 @@ class SAP_API:
     def PreprocessForOCR(img: Image, threshold = 180):
         img = img.convert("L")
         img = img.point(lambda p: 255 if p < threshold else 0)
-        img = cv2.floodFill(np.array(img), None, (0,0), 255)
-        img = PILImage.fromarray(img[1])
+        # img = cv2.floodFill(np.array(img), None, (0,0), 255)
+        # img = PILImage.fromarray(img[1])
         return img
 
     @staticmethod
